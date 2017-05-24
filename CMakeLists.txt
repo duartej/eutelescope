@@ -229,7 +229,9 @@ ADD_EUTELESCOPE_TOOL( pedestalmerge )
  ENDIF()
 
 # display some variables and write them to cache
-DISPLAY_STD_VARIABLES()
+
+# generate and install following configuration files
+GENERATE_PACKAGE_CONFIGURATION_FILES( EUTelescopeConfig.cmake EUTelescopeConfigVersion.cmake EUTelescopeLibDeps.cmake )
 
 # create some useful symbolic links in bin directory at install time
 install (CODE
@@ -244,6 +246,7 @@ install (CODE
 
 
 )
+
 
 option(utest "Build all tests." OFF)
 if(utest)
