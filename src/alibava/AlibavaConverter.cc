@@ -419,90 +419,107 @@ void AlibavaConverter::readDataSource(int /* numEvents */)
 }
 
 
-void AlibavaConverter::end () 
+void AlibavaConverter::end() 
 {
-	
-	streamlog_out ( MESSAGE5 )  << "AlibavaConverter Successfully finished" << endl;
+    streamlog_out ( MESSAGE5 )  << "AlibavaConverter Successfully finished" << std::endl;
 }
 
-double AlibavaConverter::tdc_time(unsigned int tdcTime){
-	unsigned short fpart = tdcTime & 0xffff;
-	short ipart = (tdcTime & 0xffff0000)>>16;
-	if (ipart<0)
-		fpart *= -1;
-	//double tt = 100.*(1. -(ipart + (fpart/65535.)));
-	double tt = 100.0*(ipart + (fpart/65535.));
-	return tt;
+double AlibavaConverter::tdc_time(unsigned int tdcTime)
+{
+    unsigned short fpart = tdcTime & 0xffff;
+    short ipart = (tdcTime & 0xffff0000)>>16;
+    if (ipart<0)
+    {
+        fpart *= -1;
+    }
+    //double tt = 100.*(1. -(ipart + (fpart/65535.)));
+    double tt = 100.0*(ipart + (fpart/65535.));
+    return tt;
 }
 
-double AlibavaConverter::get_temperature(unsigned short temp){
-	if (temp==0)
-		return 9999.;
-	else
-		return 0.12*temp - 39.8;
+double AlibavaConverter::get_temperature(unsigned short temp)
+{
+    if(temp==0)
+    {
+        return 9999.;
+    }
+    else
+    {
+        return 0.12*temp - 39.8;
+    }
 }
 
-void AlibavaConverter::checkIfChipSelectionIsValid(){
+void AlibavaConverter::checkIfChipSelectionIsValid()
+{
+    bool resetChipSelection = false;
+    
+    // check if there is chip selection or if there is chip selection but not valid
+    if(_chipSelection.size()==0)
+    {
+        streamlog_out( WARNING5 )<< "You didn't select any chip"<<std::endl;
+        resetChipSelection = true;
+    }
+    else if( int(_chipSelection.size())> ALIBAVA::NOOFCHIPS) 
+    {
+        streamlog_out( WARNING5 )<< "The number of chips you selected ( "
+            <<_chipSelection.size()<<" ) is more than an alibava daughter board can have ( "
+            <<ALIBAVA::NOOFCHIPS<<" )"<<std::endl;
+        resetChipSelection= true;
+    }
+    else
+    {
+        // first sort the chip numbers in ascending order
+        std::sort(_chipSelection.begin(),_chipSelection.end());
+        // check if the selected chips make sense
+        for(int ichip=0; ichip<int(_chipSelection.size()); ++ichip) 
+        {
+            bool del_this_chip = false;
+            if(_chipSelection[ichip]<0)
+            {
+                streamlog_out( ERROR5 )<< "Selected chip cannot have negative value. "<<std::endl;
+                del_this_chip =true;
+            }
+            else if(_chipSelection[ichip]>=ALIBAVA::NOOFCHIPS)
+            {
+                streamlog_out( ERROR5 )<< "Chip numbering has to start from zero \"0\" "
+                    << "and cannot be greater than " << ALIBAVA::NOOFCHIPS-1 << std::endl;
+                del_this_chip = true;
+            }
+            
+            // if this chip selection is not valid, delete it.
+            if(del_this_chip) 
+            {
+                streamlog_out( ERROR5 )<< "Chip "<<_chipSelection[ichip]
+                    <<" is deleted from the chip selection list"<< std::endl;
+                _chipSelection.erase(_chipSelection.begin()+ichip);
+                ichip = ichip-1;
+            }
+        }// end of ichip loop
 	
-	bool resetChipSelection = false;
-	
-	// check if there is chip selection or if there is chip selection but not valid
-	if (_chipSelection.size()==0){
-		streamlog_out( WARNING5 )<< "You didn't select any chip"<<endl;
-		resetChipSelection = true;
-	}
-	else if (int(_chipSelection.size())> ALIBAVA::NOOFCHIPS) {
-		streamlog_out( WARNING5 )<< "The number of chips you selected ( "<<_chipSelection.size()<<" ) is more than an alibava daughter board can have ( "<<ALIBAVA::NOOFCHIPS<<" )"<<endl;
-		resetChipSelection= true;
-	}
-	else{
-		// first sort the chip numbers in ascending order
-		sort(_chipSelection.begin(),_chipSelection.end());
-		
-		// check if the selected chips make sense
-		for (int ichip=0; ichip<int(_chipSelection.size()); ichip++) {
-			bool del_this_chip = false;
-			
-			if (_chipSelection[ichip]<0){
-				streamlog_out( ERROR5 )<< "Selected chip cannot have negative value. "<< endl;
-				del_this_chip =true;
-			}
-			else if (_chipSelection[ichip]>=ALIBAVA::NOOFCHIPS){
-				streamlog_out( ERROR5 )<< "Chip numbering has to start from zero \"0\" and cannot be greater than " << ALIBAVA::NOOFCHIPS-1 << endl;
-				del_this_chip = true;
-			}
-			
-			if (del_this_chip) { // if this chip selection is not valid, delete it.
-				streamlog_out( ERROR5 )<< "Chip "<<_chipSelection[ichip]<<" is deleted from the chip selection list"<< endl;
-				_chipSelection.erase(_chipSelection.begin()+ichip);
-				ichip = ichip-1;
-			}
-		}// end of ichip loop
-		
-		// check again if there is any selected chip left
-		if (_chipSelection.size()==0) resetChipSelection= true;
-		
-		
-	}
-	
-	if (resetChipSelection) {
-		streamlog_out( WARNING5 )<< "I will save data from all chips"<< endl;
-		
-		_chipSelection.clear();
-		
-		for (int ichip=0; ichip<ALIBAVA::NOOFCHIPS; ichip++) {
-			_chipSelection.push_back(ichip);
-		}
-	}
-	
-	
-	// now there is valid chip selection!!!
-	
-	streamlog_out( WARNING5 )<< "Final applied chip selection: ";
-	for (int ichip=0; ichip<int(_chipSelection.size()); ichip++)
-		streamlog_out( WARNING5 )<< _chipSelection[ichip] << " ";
-	streamlog_out( WARNING5 )<<endl;
-	streamlog_out( WARNING5 )<< "Only data coming from these chips will be stored"<<endl;
-	
+        // check again if there is any selected chip left
+        if(_chipSelection.size()==0)
+        {
+            resetChipSelection= true;
+        }
+    }
+    
+    if (resetChipSelection) 
+    {
+        streamlog_out( WARNING5 )<< "I will save data from all chips"<< std::endl;
+        _chipSelection.clear();
+        for (int ichip=0; ichip<ALIBAVA::NOOFCHIPS; ichip++) 
+        {
+            _chipSelection.push_back(ichip);
+        }
+    }
+
+    // now there is valid chip selection!!!
+    streamlog_out( WARNING5 )<< "Final applied chip selection: ";
+    for(int ichip=0; ichip<int(_chipSelection.size()); ++ichip)
+    {
+        streamlog_out( WARNING5 )<< _chipSelection[ichip] << " ";
+    }
+    streamlog_out( WARNING5 )<<std::endl;
+    streamlog_out( WARNING5 )<< "Only data coming from these chips will be stored"<<std::endl;	
 }
 
