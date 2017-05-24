@@ -3,7 +3,15 @@
  *  (2014 DESY)
  *
  *  email:eda.yildirim@cern.ch
+ *
+ *  Modified by J. Duarte-Campderros
+ *  (2017 IFCA-CERN) jorge.duarte.campderros@cern.ch
+ *    - (Partially yet) Clean and coding style (Allman)
+ *
  */
+
+// INTERNAL NOTE : [JDC] Still figuring out when is used this processor...
+//                 so far, it seems like a function pool class
 
 
 // alibava includes ".h"
@@ -17,6 +25,7 @@
 #include "marlin/Exceptions.h"
 #include "marlin/Global.h"
 
+// REALLY??
 #if defined(USE_AIDA) || defined(MARLIN_USE_AIDA)
 // aida includes <.h>
 #include <marlin/AIDAProcessor.h>
@@ -44,32 +53,30 @@ using namespace alibava;
 
 
 AlibavaBaseProcessor::AlibavaBaseProcessor (std::string processorName) :
-Processor(processorName),
-_rootObjectMap(),
-_inputCollectionName(ALIBAVA::NOTSET),
-_outputCollectionName(ALIBAVA::NOTSET),
-_pedestalFile(ALIBAVA::NOTSET),
-_calibrationFile(ALIBAVA::NOTSET),
-_pedestalCollectionName(ALIBAVA::NOTSET),
-_noiseCollectionName(ALIBAVA::NOTSET),
-_chargeCalCollectionName(ALIBAVA::NOTSET),
-_channelsToBeUsed(),
-_skipMaskedEvents(false),
-_numberOfSkippedEvents(0),
-_chipSelection(),
-_pedestalMap(),
-_noiseMap(),
-_chargeCalMap(),
-_isPedestalValid(false),
-_isNoiseValid(false),
-_isCalibrationValid(false)
+    Processor(processorName),
+    _rootObjectMap(),
+    _inputCollectionName(ALIBAVA::NOTSET),
+    _outputCollectionName(ALIBAVA::NOTSET),
+    _pedestalFile(ALIBAVA::NOTSET),
+    _calibrationFile(ALIBAVA::NOTSET),
+    _pedestalCollectionName(ALIBAVA::NOTSET),
+    _noiseCollectionName(ALIBAVA::NOTSET),
+    _chargeCalCollectionName(ALIBAVA::NOTSET),
+    _channelsToBeUsed(),
+    _skipMaskedEvents(false),
+    _numberOfSkippedEvents(0),
+    _chipSelection(),
+    _pedestalMap(),
+    _noiseMap(),
+    _chargeCalMap(),
+    _isPedestalValid(false),
+    _isNoiseValid(false),
+    _isCalibrationValid(false)
 {
-	
-	// modify processor description
-	_description = "AlibavaBaseProcessor";
-	
-	// reset all the final arrays
-	setAllMasksTo(false);
+    // modify processor description
+    _description = "AlibavaBaseProcessor";
+    // reset all the final arrays
+    setAllMasksTo(false);
 }
 
 // checks if the root object exists in _rootObjectMap
@@ -400,70 +407,84 @@ bool AlibavaBaseProcessor::isMasked(int ichip, int ichan){
 	}
 }
 
-void AlibavaBaseProcessor::setChannelsToBeUsed(){
+void AlibavaBaseProcessor::setChannelsToBeUsed()
+{
+    // FIXME:: Probably does not need this function. A better parameter could be
+    //         defined instead of the _channelsToBeUsed string
+    //
+    // Let's decode this StringVec.
+    /*  The format of _channelsToBeUsed string parameter shoul be like
+     *  $0:5-20$ $0:30-100$ $1:50-70$ means from chip 0 channels between 5-20 and 30-100, from chip 1 channels between 50-70
+     *  will be used (all numbers included).
+     *   the rest will be masked and not used
+     *   Note that the numbers should be in ascending order
+     */
+    streamlog_out (DEBUG5) <<"Setting channels to be used! "<<endl;
 	
-	// Let's decode this StringVec.
-	/*  The format of _channelsToBeUsed string parameter shoul be like
-	 *   $0:5-20$ $0:30-100$ $1:50-70$ means from chip 0 channels between 5-20 and 30-100, from chip 1 channels between 50-70
-	 *    will be used (all numbers included).
-	 *   the rest will be masked and not used
-	 *   Note that the numbers should be in ascending order
-	 */
-	streamlog_out (DEBUG5) <<"Setting channels to be used! "<<endl;
-	
-	// first mask all channels later we will unmask the ones selected
-	setAllMasksTo(true);
-	streamlog_out (DEBUG5) <<"All channels masked for now!"<<endl;
-	
-	// now loop over strings to decode it
-	for (unsigned int istr=0; istr<_channelsToBeUsed.size(); istr++) {
-		string istring = _channelsToBeUsed[istr];
-		int onchip, fromchannel, tochannel;
-		decodeMaskingString(istring, &onchip, &fromchannel, &tochannel);
-		streamlog_out (DEBUG5) <<"Processing channel selection: "<<istring<< " ... un-masking channels from "<<fromchannel<<" to "<<tochannel<<" on chip "<<onchip<< endl;
-		if (isMaskingValid(onchip,fromchannel,tochannel)) {
-			// unmask the selected channels
-			for (int ichan = fromchannel; ichan<tochannel+1; ichan++)
-				_isMasked[onchip][ichan]=false;
-			
-		}
-	}
-	printChannelMasking();
-	
+    // first mask all channels later we will unmask the ones selected
+    setAllMasksTo(true);
+    streamlog_out (DEBUG5) <<"All channels masked for now!"<<endl;
+    
+    // now loop over strings to decode it
+    for (unsigned int istr=0; istr<_channelsToBeUsed.size(); ++istr) 
+    {
+        string istring = _channelsToBeUsed[istr];
+        int onchip, fromchannel, tochannel;
+        decodeMaskingString(istring, &onchip, &fromchannel, &tochannel);
+        streamlog_out (DEBUG5) <<"Processing channel selection: "<<istring
+            << " ... un-masking channels from "<<fromchannel<<" to "
+            <<tochannel<<" on chip "<<onchip<< std::endl;
+        if (isMaskingValid(onchip,fromchannel,tochannel)) 
+        {
+            // unmask the selected channels
+            for(int ichan = fromchannel; ichan<tochannel+1; ++ichan)
+            {
+                _isMasked[onchip][ichan]=false;
+            }
+    		
+    	}
+    }
+    printChannelMasking();
 }
-void AlibavaBaseProcessor::decodeMaskingString(string istring, int *onchip, int *fromchannel, int *tochannel ){
+
+void AlibavaBaseProcessor::decodeMaskingString(string istring, int *onchip, int *fromchannel, int *tochannel )
+{
+
+    // FIXME:: Probably does not need this function. A better parameter could be
+    //         defined instead of the _channelsToBeUsed string
+    //         See setChannelsToBeUsed function
 	
-	//lets first set everything to -1 to check later
-	*onchip = -1;
-	*fromchannel = -1;
-	*tochannel = -1;
-	
-	size_t tmppos=0;
-	string tmpstring;
-	while (tmppos<istring.size()) {
-		
-		//first find the pos of " character
-		tmppos = istring.find("$",0);
-		tmppos = tmppos+1;
-		
-		//find the chip number
-		tmpstring = getSubStringUpToChar(istring,":",tmppos);
-		*onchip = atoi(tmpstring.c_str());
-		tmppos = tmppos + tmpstring.size()+1;
-		
-		
-		// start chan
-		tmpstring = getSubStringUpToChar(istring,"-",tmppos);
-		*fromchannel = atoi(tmpstring.c_str());
-		tmppos = tmppos + tmpstring.size()+1;
-		
-		if (tmppos >= istring.size()) break;
-		//end chan
-		tmpstring = getSubStringUpToChar(istring,"$",tmppos);
-		tmppos = tmppos + tmpstring.size()+1;
-		*tochannel = atoi(tmpstring.c_str());
-		
-	}
+    //lets first set everything to -1 to check later
+    *onchip = -1;
+    *fromchannel = -1;
+    *tochannel = -1;
+    
+    size_t tmppos=0;
+    string tmpstring;
+    while(tmppos<istring.size()) 
+    {   	
+    	//first find the pos of " character
+    	tmppos = istring.find("$",0);
+    	tmppos = tmppos+1;
+    	
+    	//find the chip number
+    	tmpstring = getSubStringUpToChar(istring,":",tmppos);
+    	*onchip = atoi(tmpstring.c_str());
+    	tmppos = tmppos + tmpstring.size()+1;
+    	
+    	
+    	// start chan
+    	tmpstring = getSubStringUpToChar(istring,"-",tmppos);
+    	*fromchannel = atoi(tmpstring.c_str());
+    	tmppos = tmppos + tmpstring.size()+1;
+    	
+    	if (tmppos >= istring.size()) break;
+    	//end chan
+    	tmpstring = getSubStringUpToChar(istring,"$",tmppos);
+    	tmppos = tmppos + tmpstring.size()+1;
+    	*tochannel = atoi(tmpstring.c_str());
+    	
+    }
 }
 
 bool AlibavaBaseProcessor::isMaskingValid(int onchip, int fromchannel, int tochannel ){

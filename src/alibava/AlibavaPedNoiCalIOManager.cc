@@ -3,6 +3,11 @@
  *  (2014 DESY)
  *
  *  email:eda.yildirim@cern.ch
+ *
+ *  Modified by J. Duarte-Campderros
+ *  (2017 IFCA-CERN) jorge.duarte.campderros@cern.ch
+ *    - Clean and coding style (Allman)
+ *
  */
 
 // alibava includes ".h"
@@ -31,43 +36,54 @@ using namespace std;
 using namespace lcio;
 using namespace alibava;
 
-AlibavaPedNoiCalIOManager::AlibavaPedNoiCalIOManager(){
+AlibavaPedNoiCalIOManager::AlibavaPedNoiCalIOManager()
+{
 }
 
-AlibavaPedNoiCalIOManager::~AlibavaPedNoiCalIOManager(){
+AlibavaPedNoiCalIOManager::~AlibavaPedNoiCalIOManager()
+{
 }
 
-EVENT::FloatVec AlibavaPedNoiCalIOManager::getDataFromEventForChip(LCEvent* evt, string collectionName, unsigned int chipnum){
+EVENT::FloatVec AlibavaPedNoiCalIOManager::getDataFromEventForChip(LCEvent* evt, 
+        const std::string & collectionName, const int & chipnum)
+{
+    // FIXME:: This functions are totally redundant. 
+    // A better approach uses the ALIBAVA::NOOFCHIPS to check that
+    // the chipnum is lower than that ... however you need the CellIDDecoder...
+    // 
+    //
+    // The vector of charges 
+    EVENT::FloatVec tmp_vec;
+    tmp_vec.clear();
+    
+    // Get the raw data for the chip 'chipnum'
+    LCCollectionVec* col = dynamic_cast< LCCollectionVec * > (evt->getCollection(collectionName)) ;
 	
-	EVENT::FloatVec tmp_vec;
-	tmp_vec.clear();
-	
-	LCCollectionVec* col = dynamic_cast< LCCollectionVec * > (evt->getCollection(collectionName)) ;
-	
-	int ielement = getElementNumberOfChip(col,chipnum);
-	if (ielement!=-1) {
-		TrackerDataImpl * trkdata = dynamic_cast< TrackerDataImpl * > ( col->getElementAt( ielement ) ) ;
-		tmp_vec = trkdata->getChargeValues();
-	}
-	
-	return tmp_vec;
+    const int ielement = getElementNumberOfChip(col,chipnum);
+    if(ielement!=-1) 
+    {
+        TrackerDataImpl * trkdata = dynamic_cast< TrackerDataImpl * > ( col->getElementAt( ielement ) ) ;
+        tmp_vec = trkdata->getChargeValues();
+    }
+    return tmp_vec;
 }
 
-int AlibavaPedNoiCalIOManager::getElementNumberOfChip(LCCollectionVec* col, int chipnum){
-	int ielement = -1;
-	CellIDDecoder<TrackerDataImpl> chipIDDecoder(col);
-	unsigned int noOfChips = col->getNumberOfElements();
-	for ( size_t i = 0; i < noOfChips; ++i )
-	{
-		
-		TrackerDataImpl * trkdata = dynamic_cast< TrackerDataImpl * > ( col->getElementAt( i ) ) ;
-		// check chip number
-		const int ichip = static_cast<int> ( chipIDDecoder( trkdata )[ALIBAVA::ALIBAVADATA_ENCODE_CHIPNUM] );
-
-		if (chipnum==ichip)
-			ielement=i;
-	}
-	return ielement;
+int AlibavaPedNoiCalIOManager::getElementNumberOfChip(LCCollectionVec* col, const int & chipnum)
+{
+    CellIDDecoder<TrackerDataImpl> chipIDDecoder(col);
+    // Loop over the chips
+    for(int i = 0; i < col->getNumberOfElements(); ++i)
+    {
+        // Get the chip header
+        TrackerDataImpl * trkdata = dynamic_cast<TrackerDataImpl*>( col->getElementAt(i) );
+        // check chip number
+        const int ichip = static_cast<int>( chipIDDecoder(trkdata)[ALIBAVA::ALIBAVADATA_ENCODE_CHIPNUM] );
+        if(chipnum==ichip)
+        {
+            return i;
+        }
+    }
+    return -1;
 }
 
 
@@ -108,21 +124,22 @@ EVENT::FloatVec AlibavaPedNoiCalIOManager::getPedNoiCalForChip(string filename, 
 	
 }
 
-void AlibavaPedNoiCalIOManager::createFile(string filename, IMPL::LCRunHeaderImpl* runHeader){
-	
-	
-	LCWriter * lcWriter = LCFactory::getInstance()->createLCWriter();
-	
-	try {
-		lcWriter->open(filename, LCIO::WRITE_NEW);
-	} catch (IOException& e) {
-		cerr << e.what() << endl;
-		return;
-	}
-	
-	lcWriter->writeRunHeader(runHeader);
-	
-	lcWriter->close();
+// 
+void AlibavaPedNoiCalIOManager::createFile(const std::string & filename, IMPL::LCRunHeaderImpl* runHeader)
+{
+    // XXX: WHy don't use a LCIOOutputProcessor??
+    LCWriter * lcWriter = LCFactory::getInstance()->createLCWriter();
+    try 
+    {
+        lcWriter->open(filename, LCIO::WRITE_NEW);
+    } 
+    catch (IOException& e) 
+    {
+        std::cerr << e.what() << std::endl;
+        return;
+    }
+    lcWriter->writeRunHeader(runHeader);
+    lcWriter->close();
 }
 
 
@@ -212,7 +229,7 @@ bool AlibavaPedNoiCalIOManager::doesFileExist(string astring){
 	return (stat (astring.c_str(), &buffer) == 0);
 }
 
-void AlibavaPedNoiCalIOManager::createFile(string filename){
+void AlibavaPedNoiCalIOManager::createFile(const std::string & filename){
 	LCRunHeaderImpl* runHeader = new LCRunHeaderImpl();
 	int runnumber = 0;
 	runHeader->setRunNumber(runnumber);
