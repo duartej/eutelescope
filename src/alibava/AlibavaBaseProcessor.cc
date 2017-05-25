@@ -113,43 +113,52 @@ std::string AlibavaBaseProcessor::getOutputCollectionName(){
 // Pedestal and Noise
 ///////////////////////////
 
-
 // used to set pedestal and noise values
 // Note that chipSelection has to be set first!!!
-void AlibavaBaseProcessor::setPedestals(){
-	// first get selected chips
-	EVENT::IntVec selectedchips = getChipSelection();
-	if(selectedchips.size()==0)
-		streamlog_out(ERROR5)<< "No selected chips found! Couldn't set the pedestal, noise values!"<<endl;
-	
-	AlibavaPedNoiCalIOManager man;
-	EVENT::FloatVec vec_float;
-	
-	// for each selected chip get and save pedestal and noise values
-	for (unsigned int ichip=0; ichip<selectedchips.size(); ichip++) {
-		int chipnum = selectedchips[ichip];
+void AlibavaBaseProcessor::setPedestals()
+{
+    // first get selected chips
+    EVENT::IntVec selectedchips = getChipSelection();
+    if(selectedchips.size()==0)
+    {
+        streamlog_out(ERROR5)<< "No selected chips found! Couldn't set the pedestal, noise values!"<<endl;
+    }
+    AlibavaPedNoiCalIOManager man;
+    EVENT::FloatVec vec_float;
+    
+    // for each selected chip, get and save pedestal and noise values
+    for(unsigned int ichip=0; ichip<selectedchips.size(); ichip++) 
+    {
+        int chipnum = selectedchips[ichip];
+        // if pedestalCollectionName set
+        if(getPedestalCollectionName()!= string(ALIBAVA::NOTSET)) 
+        {
+            // get pedestal for this chip
+	     vec_float.clear();
+             vec_float = man.getPedNoiCalForChip(_pedestalFile,_pedestalCollectionName, chipnum);
+             _pedestalMap.insert(make_pair(chipnum, vec_float));
+        }
+        else
+        {
+            streamlog_out(DEBUG5)<< "The pedestal values for chip "
+                <<chipnum<<" is not set, since pedestalCollectionName is not set!"<<std::endl;
+        }
 		
-		// if pedestalCollectionName set
-		if (getPedestalCollectionName()!= string(ALIBAVA::NOTSET)) {
-			// get pedestal for this chip
-			vec_float.clear();
-			vec_float = man.getPedNoiCalForChip(_pedestalFile,_pedestalCollectionName, chipnum);
-			_pedestalMap.insert(make_pair(chipnum, vec_float));
-		}else{
-			streamlog_out(DEBUG5)<< "The pedestal values for chip "<<chipnum<<" is not set, since pedestalCollectionName is not set!"<<endl;
-		}
-		
-		// if noiseCollectionName set
-		if(getNoiseCollectionName()!= string(ALIBAVA::NOTSET)){
-			// get noise for this chip
-			vec_float.clear();
-			vec_float = man.getPedNoiCalForChip(_pedestalFile,_noiseCollectionName, chipnum);
-			_noiseMap.insert(make_pair(chipnum, vec_float));
-		}else{
-			streamlog_out(DEBUG5)<< "The noise values for chip "<<chipnum<<" is not set, since noiseCollectionName is not set!"<<endl;
-		}
-	}
-	checkPedestals();
+	// if noiseCollectionName set
+        if(getNoiseCollectionName()!= string(ALIBAVA::NOTSET))
+        {
+            // get noise for this chip
+            vec_float.clear();
+            vec_float = man.getPedNoiCalForChip(_pedestalFile,_noiseCollectionName, chipnum);
+            _noiseMap.insert(make_pair(chipnum, vec_float));
+        }
+        else
+        {
+            streamlog_out(DEBUG5)<< "The noise values for chip "<<chipnum
+                <<" is not set, since noiseCollectionName is not set!"<<std::endl;
+        }
+    }
+    checkPedestals();
 }
 
 void AlibavaBaseProcessor::checkPedestals(){
@@ -216,8 +225,9 @@ void AlibavaBaseProcessor::checkPedestals(){
 void AlibavaBaseProcessor::setPedestalCollectionName(std::string pedestalCollectionName){
 	_pedestalCollectionName = pedestalCollectionName;
 }
-std::string AlibavaBaseProcessor::getPedestalCollectionName(){
-	return _pedestalCollectionName;
+std::string AlibavaBaseProcessor::getPedestalCollectionName()
+{
+    return _pedestalCollectionName;
 }
 
 
