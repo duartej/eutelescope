@@ -12,6 +12,9 @@
  *    - Change algorithm to evaluate common noise, including a 
  *      convergence loop to avoid signal contamination in the 
  *      calculation
+ *    - Major changes in the classes logic, remove unnecessary 
+ *      methods.
+ *    - Remove 1d histo, and add 2d for error
  *
  */
 
@@ -424,7 +427,8 @@ void AlibavaConstantCommonModeProcessor::bookHistos(const int & _NtotalEvt)
     }
     int nbins_adc=2.0*_adcmax;
 
-    for(int ichip = 0; ichip < ALIBAVA::NOOFCHIPS; ++ichip)
+    EVENT::IntVec chipVec = this->getChipSelection();
+    for(const auto & ichip: chipVec)
     {
         // be careful not overloading the memory
         unsigned int nbins=NtotalEvt;

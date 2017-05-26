@@ -176,9 +176,7 @@ namespace alibava
             float _adcmax_err;
             //! Range for the ADCs  in the histograms
             float _adcmin_err;
-            
-            
-            
+          
         protected:
 	    //! Calculates common mode values and fills the histograms. 
             /*! Returns the common mode vec and the associated error
