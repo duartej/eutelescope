@@ -38,7 +38,6 @@
 #include <IMPL/TrackerDataImpl.h>
 
 // ROOT includes ".h"
-#include "TH1D.h"
 #include "TH1F.h"
 #include "TF1.h"
 #include "TROOT.h"
@@ -64,7 +63,10 @@ AlibavaPedestalNoiseProcessor::AlibavaPedestalNoiseProcessor() :
     _noiseHistoName ("hnoise"),
     _temperatureHistoName("htemperature"),
     _chanDataHistoName ("Data_chan"),
-    _chanDataFitName ("Fit_chan")
+    _chanDataFitName ("Fit_chan"),
+    _adcmax(1000.0),
+    _adcmin(0.0),
+    _nbins(1000)
 {
     // modify processor description
     _description ="AlibavaPedestalNoiseProcessor computes the pedestal"\
@@ -80,6 +82,16 @@ AlibavaPedestalNoiseProcessor::AlibavaPedestalNoiseProcessor() :
             "Pedestal collection name, better not to change",_pedestalCollectionName, string ("pedestal"));
     registerOptionalParameter ("NoiseCollectionName",
             "Noise collection name, better not to change",_noiseCollectionName, string ("noise"));
+    registerOptionalParameter ("MaxADCsCountsForHistograms",
+            "The max ADCs counts which define the ranges of the histograms",
+            _adcmax, float(1000.0) );
+    registerOptionalParameter ("MinADCsCountsForHistograms",
+            "The min ADCs counts which define the ranges of the histograms",
+            _adcmax, float(0.0) );
+    registerOptionalParameter ("NbinsForHistograms",
+            "The number of bins for the histograms",
+            _adcmin, float(1000) );
+
 }
 
 
@@ -132,7 +144,7 @@ void AlibavaPedestalNoiseProcessor::processRunHeader(LCRunHeader * rdr)
     // An instance of the input output manager (Pedestal and noise)
     AlibavaPedNoiCalIOManager man;
     // Prepare the lcio file with the pedestal and noise, using the
-    // run Header of the input lcio (i.e. the uncorrected pedestal lcio file)
+    // run Header of the input lcio (i.e. the uncorrected pedestal lcio file?)
     man.createFile(_pedestalFile, arunHeader->lcRunHeader());
     // and book the needed histograms
     bookHistos();
@@ -163,7 +175,7 @@ void AlibavaPedestalNoiseProcessor::processEvent(LCEvent * anEvent)
     }
     
     // fill temperature histogram
-    if(TH1D * temperatureHisto = dynamic_cast<TH1D*> (_rootObjectMap[_temperatureHistoName]))
+    if(TH1F * temperatureHisto = dynamic_cast<TH1F*> (_rootObjectMap[_temperatureHistoName]))
     {
         temperatureHisto->Fill(alibavaEvent->getEventTemp());
     }
@@ -211,13 +223,13 @@ void AlibavaPedestalNoiseProcessor::calculatePedestalNoise()
     for(auto ichip: chipSelection) 
     {
         // Get the pedestal and noise histos
-        TH1D * hped = dynamic_cast<TH1D*> (_rootObjectMap[getPedestalHistoName(ichip)]);
+        TH1F * hped = dynamic_cast<TH1F*> (_rootObjectMap[getPedestalHistoName(ichip)]);
         if(hped == nullptr)
         {
             streamlog_out ( ERROR5 ) << "Pedestal histogram '" 
                 << getPedestalHistoName(ichip) << "' not booked." << std::endl;
         }
-        TH1D * hnoi = dynamic_cast<TH1D*> (_rootObjectMap[getNoiseHistoName(ichip)]);
+        TH1F * hnoi = dynamic_cast<TH1F*> (_rootObjectMap[getNoiseHistoName(ichip)]);
         if(hnoi == nullptr)
         {
             streamlog_out ( ERROR5 ) << "Pedestal histogram '" 
@@ -237,7 +249,7 @@ void AlibavaPedestalNoiseProcessor::calculatePedestalNoise()
                 // of the gaussian to fit
                 tempFitName = getChanDataFitName(ichip, ichan);
                 tempHistoName = getChanDataHistoName(ichip, ichan);
-                TH1D * histo = dynamic_cast<TH1D*> (_rootObjectMap[tempHistoName]);
+                TH1F * histo = dynamic_cast<TH1F*> (_rootObjectMap[tempHistoName]);
                 TF1 * tempfit = dynamic_cast<TF1*> (_rootObjectMap[tempFitName]);
                 // Fit to a gaussian
                 histo->Fit(tempfit,"Q");
@@ -299,7 +311,7 @@ void AlibavaPedestalNoiseProcessor::fillHistos(TrackerDataImpl * trkdata)
         }
         
         std::string tempHistoName = getChanDataHistoName(chipnum, ichan);
-        if( TH1D * histo = dynamic_cast<TH1D*> (_rootObjectMap[tempHistoName]) )
+        if( TH1F * histo = dynamic_cast<TH1F*> (_rootObjectMap[tempHistoName]) )
         {
             histo->Fill(datavec[ichan]);
         }
@@ -309,6 +321,13 @@ void AlibavaPedestalNoiseProcessor::fillHistos(TrackerDataImpl * trkdata)
 
 void AlibavaPedestalNoiseProcessor::bookHistos()
 {
+    // Calculate the number of bins for the adc related
+    // and set the ranges
+    if(_adcmax < _adcmin)
+    {
+        streamlog_out( ERROR ) << "Inconsistent definition of ranges in the histograms: "
+            << "[XXX TO FiNISH THE MESSAGE]"  << std::endl;
+    }
     AIDAProcessor::tree(this)->cd(this->name());
     EVENT::IntVec chipSelection = getChipSelection();
     
@@ -316,7 +335,7 @@ void AlibavaPedestalNoiseProcessor::bookHistos()
     //this is guaranteed with AlibavaConverter::checkIfChipSelectionIsValid()
     
     // temperature of event
-    TH1D * temperatureHisto = new TH1D(_temperatureHistoName.c_str(),"Temperature",1000,-50,50);
+    TH1F * temperatureHisto = new TH1F(_temperatureHistoName.c_str(),"Temperature",1000,-50,50);
     _rootObjectMap.insert(std::make_pair(_temperatureHistoName,temperatureHisto));
     
     // Create the histograms for the final pedestals/noise per channel
@@ -324,22 +343,20 @@ void AlibavaPedestalNoiseProcessor::bookHistos()
     {
         unsigned int ichip=chipSelection[i];
         // Pedestal: 
-        TH1D * pedestalHisto = new TH1D(getPedestalHistoName(ichip).c_str(),"",
+        TH1F * pedestalHisto = new TH1F(getPedestalHistoName(ichip).c_str(),"",
                 ALIBAVA::NOOFCHANNELS,-0.5,ALIBAVA::NOOFCHANNELS-0.5);
         _rootObjectMap.insert(std::make_pair(getPedestalHistoName(ichip), pedestalHisto)); 
         //title string for pedestal histogram
-        std::stringstream sp;
-	sp<< "Pedestal (chip "<<ichip<<");Channel Number;Pedestal (ADCs)";
-        pedestalHisto->SetTitle((sp.str()).c_str());
+        const std::string sp("Pedestal (chip "+std::to_string(ichip)+");Channel Number;Pedestal (ADCs)");
+        pedestalHisto->SetTitle(sp.c_str());
         
         // Noise: 
-        TH1D * noiseHisto = new TH1D(getNoiseHistoName(ichip).c_str(),"",
+        TH1F * noiseHisto = new TH1F(getNoiseHistoName(ichip).c_str(),"",
                 ALIBAVA::NOOFCHANNELS, -0.5, ALIBAVA::NOOFCHANNELS-0.5);
         _rootObjectMap.insert(std::make_pair(getNoiseHistoName(ichip),noiseHisto));
         //title string for noise histogram
-        std::stringstream sn; 		
-        sn<< "Noise (chip "<<ichip<<");Channel Number;Pedestal (ADCs)";
-        noiseHisto->SetTitle((sn.str()).c_str());
+        const std::string sn("Noise (chip "+std::to_string(ichip)+");Channel Number;Noise (ADCs)");
+        noiseHisto->SetTitle(sn.c_str());
     }
     
     // create the directory to store the partial histograms/functions used
@@ -349,7 +366,6 @@ void AlibavaPedestalNoiseProcessor::bookHistos()
     
     // Histograms for the corrected pedestal and noise for each channel
     // (and chip)
-    std::string tempHistoName,tempFitName;
     for(unsigned int i=0; i<chipSelection.size(); ++i) 
     {
         const unsigned int ichip=chipSelection[i];
@@ -359,15 +375,13 @@ void AlibavaPedestalNoiseProcessor::bookHistos()
             {
                 continue;
             }
-            tempHistoName = getChanDataHistoName(ichip,ichan);
-            tempFitName = getChanDataFitName(ichip,ichan);
-            stringstream tempHistoTitle;
-            tempHistoTitle<<tempHistoName<<";ADCs;Entries";
+            const std::string tempHistoName = getChanDataHistoName(ichip,ichan);
+            const std::string tempFitName = getChanDataFitName(ichip,ichan);
+            const std::string tempHistoTitle(tempHistoName+";ADCs;Entries");
             
-            TH1D * chanDataHisto = new TH1D (tempHistoName.c_str(),"",1000,0,1000);
+            TH1F * chanDataHisto = new TH1F (tempHistoName.c_str(),"",_nbins,_adcmin,_adcmax);
             _rootObjectMap.insert(std::make_pair(tempHistoName, chanDataHisto));
-            std::string tmp_string = tempHistoTitle.str();
-            chanDataHisto->SetTitle(tmp_string.c_str());
+            chanDataHisto->SetTitle(tempHistoTitle.c_str());
             
             // The gaussian fit associated: 
             //  + mean: corrected pedestal per channel

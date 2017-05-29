@@ -159,6 +159,11 @@ namespace alibava
 	     */
 	    std::string _chanDataFitName;
 
+            //! Histogram tune: x-range and Nbins
+            float _adcmax;
+            float _adcmin;
+            int _nbins;
+
 	    //! The function that returns name of the histogram for each channel
 	    std::string getChanDataHistoName(unsigned int ichip, unsigned int ichan);
 	    

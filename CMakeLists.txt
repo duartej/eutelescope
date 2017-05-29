@@ -41,6 +41,7 @@ FIND_PACKAGE( GSL )
 FIND_PACKAGE( AIDA )
 FIND_PACKAGE( ROOT COMPONENTS Minuit Geom )
 FIND_PACKAGE( LCCD  REQUIRED )               
+FIND_PACKAGE( GBL  REQUIRED )               
 
 # search for Eigen (linear algebra) library
 FIND_PACKAGE( Eigen2 REQUIRED)
