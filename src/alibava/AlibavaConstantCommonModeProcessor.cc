@@ -5,8 +5,18 @@
  *  email:thomas.eichhorn@cern.ch
  *
  *  modified by: Eda Yildirim eda.yildirim@cern.ch
+ *
+ *  Modified by J. Duarte-Campderros
+ *  (2017 IFCA-CERN) jorge.duarte.campderros@cern.ch
+ *    - Clean and coding style (Allman)
+ *    - Change algorithm to evaluate common noise, including a 
+ *      convergence loop to avoid signal contamination in the 
+ *      calculation
+ *    - Major changes in the classes logic, remove unnecessary 
+ *      methods.
+ *    - Remove 1d histo, and add 2d for error
+ *
  */
-
 
 // alibava includes ".h"
 #include "AlibavaConstantCommonModeProcessor.h"
@@ -38,17 +48,18 @@
 
 // ROOT includes ".h"
 #include "TH1D.h"
-#include "TH2D.h"
+#include "TH2F.h"
 #include "TF1.h"
-#include "TROOT.h"
-#include "TCanvas.h"
-#include "TSystem.h"
 
 // system includes <>
 #include <string>
 #include <iostream>
 #include <sstream>
 #include <memory>
+#include <algorithm>
+#include <numeric>
+#include <cmath>
+#include <map>
 
 
 using namespace std;
@@ -59,274 +70,313 @@ using namespace alibava;
 // TODO::put masking option
 
 AlibavaConstantCommonModeProcessor::AlibavaConstantCommonModeProcessor () :
-AlibavaBaseProcessor("AlibavaConstantCommonModeProcessor"),
-_commonmodeCollectionName(ALIBAVA::NOTSET),
-_commonmodeerrorCollectionName(ALIBAVA::NOTSET),
-_Niteration(3),
-_NoiseDeviation(2.5),
-_commonmodeHistoName ("hcommonmode"),
-_commonmodeerrorHistoName ("hcommonmodeerror"),
-_commonmode(),
-_commonmodeerror()
+    AlibavaBaseProcessor("AlibavaConstantCommonModeProcessor"),
+    _commonmodeCollectionName(ALIBAVA::NOTSET),
+    _commonmodeerrorCollectionName(ALIBAVA::NOTSET),
+    _NoiseDeviation(2.5),
+    _commonModeShiftHistoName("commonModeShiftOverEvents"),
+    _commonModeShiftErrorHistoName ("commonModeShiftErrorOverEvents"),
+    _adcmax(200),
+    _adcmax_err(12),
+    _adcmin_err(0),
+    _commonmode(),
+    _commonmodeerror()
 {
-	
-	// modify processor description
-	_description =
-	"AlibavaConstantCommonModeProcessor computes the common mode values of each chip and their errors";
-	
-	
-	// first of register the input collection
-	registerInputCollection (LCIO::TRACKERDATA, "InputCollectionName",
-									  "Input data collection name (should be pedestal subtracted!)",
-									  _inputCollectionName, string("recodata") );
-
-	// now the optional parameters
-	registerOptionalParameter ("CommonModeCollectionName",
-										"Common mode collection name, better not to change",
-										_commonmodeCollectionName, string ("commonmode"));
-	registerOptionalParameter ("CommonModeErrorCollectionName",
-										"Common mode error collection name, better not to change",
-										_commonmodeerrorCollectionName, string ("commonmodeerror"));
-	
-	registerOptionalParameter ("CommonModeErrorCalculationIteration",
-										"The number of iteration that should be used in common mode calculation",
-										_Niteration, int(3) );
-
-	registerOptionalParameter ("NoiseDeviation",
-										"The limit to the deviation of noise. The data exceeds this deviation will be considered as signal and not be included in common mode error calculation",
-										_NoiseDeviation, float(2.5) );
-
+    // modify processor description
+    _description ="AlibavaConstantCommonModeProcessor computes the common "\
+                   "mode values of each chip and their errors";
+    // first of register the input collection
+    registerInputCollection (LCIO::TRACKERDATA, "InputCollectionName",
+            "Input data collection name (should be pedestal subtracted!)",
+            _inputCollectionName, string("recodata") );
+    // now the optional parameters
+    registerOptionalParameter("CommonModeCollectionName",
+            "Common mode collection name, better not to change",
+            _commonmodeCollectionName, string ("commonmode"));
+    
+    registerOptionalParameter("CommonModeErrorCollectionName",
+            "Common mode error collection name, better not to change",
+            _commonmodeerrorCollectionName, string ("commonmodeerror"));
+    
+    registerOptionalParameter ("NoiseDeviation",
+            "The limit to the deviation of noise. The data exceeds this deviation "\
+            "will be considered as signal and not be included in common mode error calculation",
+            _NoiseDeviation, float(2.5) );
+    
+    registerOptionalParameter ("MaxADCsCountsForHistograms",
+            "The max ADCs counts for the common mode which define the ranges of the histograms",
+            _adcmax, float(200.0) );
+    
+    registerOptionalParameter("MaxADCsCountsErrorForHistograms",
+            "The max ADCs counts for the common mode error which define the ranges of the histograms",
+            _adcmax_err, float(10.0) );
+    
+    registerOptionalParameter("MinADCsCountsErrorForHistograms",
+            "The min ADCs counts for the common mode error which define the ranges of the histograms",
+            _adcmin_err, float(0.0) );
 }
 
-
-void AlibavaConstantCommonModeProcessor::init () {
-	streamlog_out ( MESSAGE4 ) << "Running init" << endl;
-
-
-	/* To set of channels to be used
-	 ex.The format should be like $ChipNumber:StartChannel-EndChannel$
-	 ex. $0:5-20$ $0:30-100$ $1:50-70$
-	 means from chip 0 channels between 5-20 and 30-100, from chip 1 channels between 50-70 will be used (all numbers included). the rest will be masked and not used
-	 Note that the numbers should be in ascending order and there should be no space between two $ character
-	 */
-	if (Global::parameters->isParameterSet(ALIBAVA::CHANNELSTOBEUSED))
-		Global::parameters->getStringVals(ALIBAVA::CHANNELSTOBEUSED,_channelsToBeUsed);
-	else {
-		streamlog_out ( MESSAGE4 ) << "The Global Parameter "<< ALIBAVA::CHANNELSTOBEUSED <<" is not set! All channels will be used!" << endl;
-	}
-	
-	
-	/* To choose if processor should skip masked events
-	 ex. Set the value to 0 for false, to 1 for true
-	 */
-	if (Global::parameters->isParameterSet(ALIBAVA::SKIPMASKEDEVENTS))
-		_skipMaskedEvents = bool ( Global::parameters->getIntVal(ALIBAVA::SKIPMASKEDEVENTS) );
-	else {
-		streamlog_out ( MESSAGE4 ) << "The Global Parameter "<< ALIBAVA::SKIPMASKEDEVENTS <<" is not set! Masked events will be used!" << endl;
-	}
-	
-	// this method is called only once even when the rewind is active
-	// usually a good idea to
-	printParameters ();
-
-}
-void AlibavaConstantCommonModeProcessor::processRunHeader (LCRunHeader * rdr) {
-	streamlog_out ( MESSAGE4 ) << "Running processRunHeader" << endl;
-
-	auto arunHeader = std::make_unique<AlibavaRunHeaderImpl>(rdr);
-	arunHeader->addProcessor(type());
-
-	setChipSelection( arunHeader->getChipSelection() );
-	setChannelsToBeUsed();
-		
-	bookHistos();
-	
-	// set number of skipped events to zero (defined in AlibavaBaseProcessor)
-	_numberOfSkippedEvents = 0;
-
+void AlibavaConstantCommonModeProcessor::init()
+{
+    streamlog_out ( MESSAGE4 ) << "Running init" << std::endl;
+    /* To set of channels to be used
+     * ex.The format should be like $ChipNumber:StartChannel-EndChannel$
+     * ex. $0:5-20$ $0:30-100$ $1:50-70$ means from chip 0 channels between
+     * 5-20 and 30-100, from chip 1 channels between 50-70 will be used 
+     * (all numbers included). the rest will be masked and not used. Note 
+     * that the numbers should be in ascending order and there should be no 
+     * space between two $ character
+     */
+    if(Global::parameters->isParameterSet(ALIBAVA::CHANNELSTOBEUSED))
+    {
+        Global::parameters->getStringVals(ALIBAVA::CHANNELSTOBEUSED,_channelsToBeUsed);
+    }
+    else 
+    {
+        streamlog_out ( MESSAGE4 ) << "The Global Parameter "<< ALIBAVA::CHANNELSTOBEUSED 
+            <<" is not set! All channels will be used!" << std::endl;
+    }
+    
+    /* To choose if processor should skip masked events
+     * ex. Set the value to 0 for false, to 1 for true
+     */
+    if (Global::parameters->isParameterSet(ALIBAVA::SKIPMASKEDEVENTS))
+    {
+        _skipMaskedEvents = bool ( Global::parameters->getIntVal(ALIBAVA::SKIPMASKEDEVENTS) );
+    }
+    else 
+    {
+        streamlog_out ( MESSAGE4 ) << "The Global Parameter "<< ALIBAVA::SKIPMASKEDEVENTS 
+            <<" is not set! Masked events will be used!" << endl;
+    }
+    // this method is called only once even when the rewind is active
+    // usually a good idea to
+    printParameters ();
 }
 
-void AlibavaConstantCommonModeProcessor::processEvent (LCEvent * anEvent) {
-
-	AlibavaEventImpl * alibavaEvent = static_cast<AlibavaEventImpl*> (anEvent);
-	
-	if (_skipMaskedEvents && (alibavaEvent->isEventMasked()) ) {
-		_numberOfSkippedEvents++;
-		return;
-	}
-
-	LCCollectionVec * collectionVec;
-	LCCollectionVec* commonCollection = new LCCollectionVec(LCIO::TRACKERDATA);
-	LCCollectionVec* commerrCollection = new LCCollectionVec(LCIO::TRACKERDATA);
-
-	unsigned int noOfDetector;
-	int chipnum;
-	try
-	{
-		collectionVec = dynamic_cast< LCCollectionVec * > ( alibavaEvent->getCollection( getInputCollectionName() ) ) ;
-		noOfDetector = collectionVec->getNumberOfElements();
-		
-		streamlog_out( DEBUG0 ) << "===============================================================================" << endl;
-		streamlog_out( DEBUG0 ) << "Will now loop chips..."<< endl;
-		streamlog_out( DEBUG0 ) << "===============================================================================" << endl;
-		
-
-		CellIDEncoder<TrackerDataImpl> commonCol_CellIDEncode (ALIBAVA::ALIBAVADATA_ENCODE,commonCollection);
-		CellIDEncoder<TrackerDataImpl> commerrCol_CellIDEncode (ALIBAVA::ALIBAVADATA_ENCODE,commerrCollection);
-
-		for ( size_t i = 0; i < noOfDetector; ++i )
-		{
-
-			// Get the data
-			TrackerDataImpl * trkdata = dynamic_cast< TrackerDataImpl * > ( collectionVec->getElementAt( i ) ) ;
-
-			chipnum = getChipNum(trkdata);
-			
-			// Find Commonmode
-			calculateConstantCommonMode(trkdata);
-
-			TrackerDataImpl * commonData = new TrackerDataImpl();
-			commonData->setChargeValues(getCommonModeVec());
-			commonCol_CellIDEncode[ALIBAVA::ALIBAVADATA_ENCODE_CHIPNUM] = chipnum;
-			commonCol_CellIDEncode.setCellID(commonData);
-			commonCollection->push_back(commonData);
-
-			TrackerDataImpl * commerrData = new TrackerDataImpl();
-			commerrData->setChargeValues(getCommonModeErrorVec());
-			commerrCol_CellIDEncode[ALIBAVA::ALIBAVADATA_ENCODE_CHIPNUM] = chipnum;
-			commerrCol_CellIDEncode.setCellID(commerrData);
-			commerrCollection->push_back(commerrData);
-			
-			// Fill Histos
-			fillHistos(commonData,anEvent->getEventNumber());
-  
-		}
-		alibavaEvent->addCollection(commonCollection, getCommonModeCollectionName());
-		alibavaEvent->addCollection(commerrCollection, getCommonModeErrorCollectionName());
-
-	}
-	catch ( lcio::DataNotAvailableException )
-	{
-		// do nothing again
-		streamlog_out( ERROR5 ) << "Collection ("<<getInputCollectionName()<<") not found! " << endl;
-	}
-	
+void AlibavaConstantCommonModeProcessor::processRunHeader (LCRunHeader * rdr) 
+{
+    streamlog_out ( MESSAGE4 ) << "Running processRunHeader" << std::endl;
+    
+    auto arunHeader = std::make_unique<AlibavaRunHeaderImpl>(rdr);
+    arunHeader->addProcessor(type());
+    
+    setChipSelection( arunHeader->getChipSelection() );
+    setChannelsToBeUsed();
+    
+    this->bookHistos(arunHeader->getNoOfEvents());
+    
+    // set number of skipped events to zero (defined in AlibavaBaseProcessor)
+    _numberOfSkippedEvents = 0;
 }
 
-void AlibavaConstantCommonModeProcessor::check (LCEvent * /* evt */ ) {
-	// nothing to check here - could be used to fill check plots in reconstruction processor
+void AlibavaConstantCommonModeProcessor::processEvent(LCEvent * anEvent)
+{
+    AlibavaEventImpl * alibavaEvent = static_cast<AlibavaEventImpl*> (anEvent);
+    if(_skipMaskedEvents && (alibavaEvent->isEventMasked()) ) 
+    {
+        _numberOfSkippedEvents++;
+        return;
+    }
+    
+    // Get the collection of pedestal corrected ADCs signal data
+    LCCollectionVec * collectionVec = nullptr;
+    try
+    {
+        collectionVec = dynamic_cast<LCCollectionVec*>(alibavaEvent->getCollection(getInputCollectionName()));
+    }
+    catch(lcio::DataNotAvailableException)
+    {
+        // do nothing again
+    	streamlog_out( ERROR5 ) << "Collection ("<<getInputCollectionName()<<") not found! " << std::endl;
+    }
+
+    // The output collections: the Common Noise  and its error
+    // And the encoders (when store the new collections)
+    // Common noise
+    LCCollectionVec* commonCollection = new LCCollectionVec(LCIO::TRACKERDATA);
+    CellIDEncoder<TrackerDataImpl> commonCol_CellIDEncode (ALIBAVA::ALIBAVADATA_ENCODE,commonCollection);
+    // common noise error
+    LCCollectionVec* commerrCollection = new LCCollectionVec(LCIO::TRACKERDATA);
+    CellIDEncoder<TrackerDataImpl> commerrCol_CellIDEncode (ALIBAVA::ALIBAVADATA_ENCODE,commerrCollection);
+
+    const unsigned int noOfDetector =collectionVec->getNumberOfElements();
+    for(unsigned int i = 0; i < noOfDetector; ++i)    
+    {
+        // Get the data
+        TrackerDataImpl * trkdata = dynamic_cast<TrackerDataImpl*>(collectionVec->getElementAt(i));
+        const int chipnum = getChipNum(trkdata);
+        // Find Commonmode and its error (i.e. the common noise)
+        auto commonModePair = this->calculateConstantCommonMode(trkdata->getChargeValues(),getChipNum(trkdata));
+        // And store it
+    	TrackerDataImpl * commonData = new TrackerDataImpl();
+    	commonData->setChargeValues(commonModePair.first);
+    	commonCol_CellIDEncode[ALIBAVA::ALIBAVADATA_ENCODE_CHIPNUM] = chipnum;
+        commonCol_CellIDEncode.setCellID(commonData);
+        commonCollection->push_back(commonData);
+        
+        TrackerDataImpl * commerrData = new TrackerDataImpl();
+    	commerrData->setChargeValues(commonModePair.second);
+    	commerrCol_CellIDEncode[ALIBAVA::ALIBAVADATA_ENCODE_CHIPNUM] = chipnum;
+    	commerrCol_CellIDEncode.setCellID(commerrData);
+    	commerrCollection->push_back(commerrData);
+    	
+    	// Fill Histos
+    	this->fillHistos(commonModePair,anEvent->getEventNumber(),chipnum);
+    }
+    alibavaEvent->addCollection(commonCollection, getCommonModeCollectionName());
+    alibavaEvent->addCollection(commerrCollection, getCommonModeErrorCollectionName());
 }
 
-
-void AlibavaConstantCommonModeProcessor::end() {
-
-	if (_numberOfSkippedEvents > 0)
-		streamlog_out ( MESSAGE5 ) << _numberOfSkippedEvents<<" events skipped since they are masked" << endl;
-	streamlog_out ( MESSAGE4 ) << "Successfully finished" << endl;
-	
+void AlibavaConstantCommonModeProcessor::check (LCEvent * /* evt */ ) 
+{
+    // nothing to check here - could be used to fill check plots in reconstruction processor
 }
 
-void AlibavaConstantCommonModeProcessor::calculateConstantCommonMode(TrackerDataImpl *trkdata){
-  
-  	EVENT::FloatVec commonmodeVec;
-	EVENT::FloatVec commonmodeerrorVec;
-
-	FloatVec datavec;
-	datavec = trkdata->getChargeValues();
-
-	
-	int chipnum = getChipNum(trkdata);
-	
-	streamlog_out( DEBUG0 ) << "Chip " << chipnum << " of " << getNumberOfChips() << ", now iterating..." << endl;
-	
-	
-	double sig=0, tmpdouble=0;
-	double mean_signal=0;
-	double sigma_mean_signal=0;
-	
-	
-	for (int i=0; i<_Niteration; i++) {
-		int nchan=0;
-		double total_signal=0;
-		double total_signal_square=0;
-		
-		// find mean value of signals
-		for ( int ichan =0; ichan < int (datavec.size()); ichan++ ){
-			if ( isMasked(chipnum, ichan) )
-				continue;
-
-			sig = datavec[ichan];
-			
-			// First iteration: take everything
-			if (i==0) {
-				total_signal += sig;
-				total_signal_square += sig*sig;
-				nchan++;
-			}
-			else{ // exclude outliers
-				tmpdouble = fabs((sig - mean_signal)/sigma_mean_signal);
-				if (tmpdouble<_NoiseDeviation) {
-					total_signal += sig;
-					total_signal_square += sig*sig;
-					nchan++;
-				}
-			}
-		} // end of loop over channels
-		// here find the deviation from mean value
-		// standard deviation = SQRT( E[x^2] - E[x]^2 )
-		// where E denotes average value
-		if (nchan>0) {
-			mean_signal=total_signal/nchan;
-			sigma_mean_signal=sqrt(total_signal_square/nchan - mean_signal*mean_signal);
-		}
-
-	} // end of iterations
-	
-	streamlog_out( DEBUG0 ) << "===============================================================================" << endl;
-	streamlog_out( DEBUG0 ) << "Chip " << chipnum << " : CommonModeCorrection = " << mean_signal << ", CommonModeCorrectionError = " << sigma_mean_signal << endl;
-
-	streamlog_out( DEBUG0 ) << "===============================================================================" << endl;
-	
-	// Now reloop over all channels and create the output vector. This will be the same for all channels
-	for ( int ichan = 0; ichan < ALIBAVA::NOOFCHANNELS ; ichan++ )
-	{
-		commonmodeVec.push_back(mean_signal);
-		commonmodeerrorVec.push_back(sigma_mean_signal);
-	}
-	
-	setCommonModeVec(commonmodeVec);
-	setCommonModeErrorVec(commonmodeerrorVec);
+void AlibavaConstantCommonModeProcessor::end() 
+{
+    if (_numberOfSkippedEvents > 0)
+    {
+        streamlog_out ( MESSAGE5 ) << _numberOfSkippedEvents<<" events skipped since they are masked" << std::endl;
+    }
+    streamlog_out ( MESSAGE4 ) << "Successfully finished" << endl;
 	
 }
 
+// The workhorse of this class
+std::pair<EVENT::FloatVec,EVENT::FloatVec> AlibavaConstantCommonModeProcessor::calculateConstantCommonMode(const EVENT::FloatVec & datavec, const int & chipnum)
+{
+    streamlog_out( DEBUG0 ) << "Calculate Constant common mode:" << std::endl;
+    streamlog_out( DEBUG0 ) << " ++ Chip " << chipnum << " of " << getNumberOfChips() << ", now iterating...";
 
-string AlibavaConstantCommonModeProcessor::getCommonCorrectionName(){
-	string s;
-	s = "Common Mode Correction Values";
-	return s;
+    // Just a cross-check
+    if(datavec.size() == 0)
+    {
+        streamlog_out(ERROR) << " Number of not masked and valid ADCs" 
+            << " (pedestal substracted) channels is ZERO." << std::endl;
+    }
+
+    // 1. Obtain the mean and the standard deviation for the signal ADCs 
+    //    (pedestal substracted) (i.e. the common noise)
+    float mean_signal  = this->getMean(datavec);
+    float stddev_signal= this->getStdDev(datavec,mean_signal);
+
+    // 2. Use the mean and standard deviation to exclude real
+    //    signal presence. Criteria, anything above 2.5 sigmas from the mean
+    //    is considered signal
+    // Map to keep only non-signal ADCs 
+    // ichannel: ADC
+    std::map<int,float> non_signal_map;
+    // initialize the map
+    for(int i=0; i < static_cast<int>(datavec.size()); ++i)
+    {
+        non_signal_map.emplace(i,datavec[i]);
+    }
+    unsigned int last_vec_size = datavec.size();
+    while( non_signal_map.size() != last_vec_size )
+    {
+        for(auto it = non_signal_map.cbegin(); it != non_signal_map.cend(); /* no increment*/)
+        {
+            if(isMasked(chipnum,it->first))
+            {
+                continue;
+            }
+            // Remove the signal channels 
+            if( std::abs(it->second-mean_signal)/stddev_signal > _NoiseDeviation )
+            {
+                non_signal_map.erase(it);
+            }
+            else
+            {
+                // or keep it
+                ++it;
+            }
+        }
+        // 3. Recalculate the mean with the excluded signal channels
+        mean_signal  = this->getMean(non_signal_map);
+        stddev_signal= this->getStdDev(non_signal_map,mean_signal);
+        // and the new vector size
+        last_vec_size = non_signal_map.size();
+    }
+
+    EVENT::FloatVec commonmodeVec(ALIBAVA::NOOFCHANNELS);
+    EVENT::FloatVec commonmodeerrorVec(ALIBAVA::NOOFCHANNELS);
+    // Now reloop over all channels and create the output vector,
+    // the same value for all the channels
+    for(int ichan = 0; ichan < ALIBAVA::NOOFCHANNELS ; ++ichan)
+    {
+    	commonmodeVec[ichan] = mean_signal;
+    	commonmodeerrorVec[ichan] = stddev_signal;
+    }
+    streamlog_out( DEBUG0 ) << " Noise common mode: " << mean_signal << " Error:"
+        << stddev_signal << std::endl;
+
+    return std::make_pair(commonmodeVec,commonmodeerrorVec);
+}
+
+EVENT::FloatVec AlibavaConstantCommonModeProcessor::convertIntoVec(const std::map<int,float> & m)
+{
+    EVENT::FloatVec v;
+    for(const auto & _f: m)
+    {
+        v.push_back(_f.second);
+    }
+    return v;
+}
+
+float AlibavaConstantCommonModeProcessor::getMean(const std::map<int,float> & m)
+{
+    return this->getMean(this->convertIntoVec(m));
+}
+
+float AlibavaConstantCommonModeProcessor::getMean(const EVENT::FloatVec & v)
+{
+    if(v.size() == 0)
+    {
+        return 0.0;
+    }
+    return std::accumulate(v.begin(),v.end(),0.0)/float(v.size());
+}
+
+float AlibavaConstantCommonModeProcessor::getStdDev(const std::map<int,float> & m,const float & mean)
+{
+    return this->getStdDev(this->convertIntoVec(m),mean);
+}
+
+float AlibavaConstantCommonModeProcessor::getStdDev(const EVENT::FloatVec & v,const float & mean)
+{
+    if(v.size()==0)
+    {
+        return 0.0;
+    }
+    // standard deviation = sqrt( E[(x-E[x])^2] )
+    std::vector<float> diff(v.size());
+    // Get x-E[x] in `diff`
+    std::transform(v.begin(),v.end(),diff.begin(),
+            [mean](const float & element) { return element-mean; } );
+    // obtain the (x-E[x])^2 by using diff*diff (inner_product)
+    const float sq_sum = std::inner_product(diff.begin(),diff.end(),diff.begin(),0.0);
+    return std::sqrt(sq_sum/diff.size());
 }
 
 
-void AlibavaConstantCommonModeProcessor::fillHistos(TrackerDataImpl * trkdata, int event){
-
-	// Fill the histograms with the corrected data
-	FloatVec datavec;
-	datavec = trkdata->getChargeValues();
-	
-	int chipnum = getChipNum(trkdata);
-	
-	for ( size_t ichan = 0 ; ichan < datavec.size() ; ichan++ )
-	{
-		if ( isMasked(chipnum,ichan) ) continue;
-		
-		string tempHistoName = getCommonCorrectionName();
-		if ( TH1D * histo = dynamic_cast<TH1D*> (_rootObjectMap[tempHistoName]) )
-			histo->Fill(datavec[ichan]);
-		
-		if (TH2D * histo = dynamic_cast<TH2D*> (_rootObjectMap["Common Mode Correction Values over Events"]) )
-			histo->Fill(event,datavec[ichan]);
-		
-	}
+void AlibavaConstantCommonModeProcessor::fillHistos(const std::pair<EVENT::FloatVec,EVENT::FloatVec> & commonNoise, const int & nevt, const int & chipnum)
+{
+    if(commonNoise.first.size() == 0)
+    {
+        return;
+    }
+    // Fill the histograms with the corrected data
+    // Remember just to use the first, all the values
+    // are exactly the same
+    if(TH2F * h = dynamic_cast<TH2F*>(_rootObjectMap[this->getHistoNameCMS(chipnum)]) )
+    {
+        h->Fill(nevt,commonNoise.first[0]);
+    }
+    if(TH2F * h = dynamic_cast<TH2F*>(_rootObjectMap[this->getHistoNameCMSError(chipnum)]) )
+    {
+        h->Fill(nevt,commonNoise.second[0]);
+    }
 }
 
 
@@ -347,56 +397,56 @@ std::string AlibavaConstantCommonModeProcessor::getCommonModeErrorCollectionName
 }
 
 
-// getter and setter for _commonmode
-void AlibavaConstantCommonModeProcessor::setCommonModeVec(EVENT::FloatVec common){
-	if (common.size()!=unsigned(ALIBAVA::NOOFCHANNELS)) {
-		streamlog_out( ERROR5 ) <<"Size of common mode vector set doesn't match with number of channels in the data stream."<< endl;
-	}
-	_commonmode = common;
-}
-EVENT::FloatVec AlibavaConstantCommonModeProcessor::getCommonModeVec(){
-	return _commonmode;
+std::string AlibavaConstantCommonModeProcessor::getHistoNameCMS(const int & ichip)
+{
+    return _commonModeShiftHistoName+"_"+std::to_string(ichip);
 }
 
-// getter and setter for _commonmodeerror
-void AlibavaConstantCommonModeProcessor::setCommonModeErrorVec(EVENT::FloatVec commonerror){
-	if (commonerror.size()!=unsigned(ALIBAVA::NOOFCHANNELS)) {
-		streamlog_out( ERROR5 ) <<"Size of common mode error vector set doesn't match with number of channels in the data stream."<< endl;
-	}
-	_commonmodeerror = commonerror;
-}
-EVENT::FloatVec AlibavaConstantCommonModeProcessor::getCommonModeErrorVec(){
-	return _commonmodeerror;
+std::string AlibavaConstantCommonModeProcessor::getHistoNameCMSError(const int & ichip)
+{
+    return _commonModeShiftErrorHistoName+"_"+std::to_string(ichip);
 }
 
+void AlibavaConstantCommonModeProcessor::bookHistos(const int & _NtotalEvt)
+{
+    // Check the total number of events, and put the whole number
+    // whenever the relevant global is not present
+    int NtotalEvt=Global::parameters->getIntVal("MaxRecordNumber");
+    if(NtotalEvt == 0)
+    {
+        NtotalEvt=_NtotalEvt;
+    }
+    // Calculate the number of bins for the adc related
+    // and set the ranges
+    int b_adcmax = _adcmax;
+    int b_adcmin = -1.0*_adcmax;
+    if(_adcmax < 0)
+    {
+        b_adcmax=b_adcmin;
+        b_adcmin=-1.0*b_adcmax;
+    }
+    int nbins_adc=2.0*_adcmax;
 
+    EVENT::IntVec chipVec = this->getChipSelection();
+    for(const auto & ichip: chipVec)
+    {
+        // be careful not overloading the memory
+        unsigned int nbins=NtotalEvt;
+        if(NtotalEvt > 20000)
+        {
+            nbins=20000;
+        }
+        // a histogram showing the common mode shift (mean over all channels per event) over events
+        std::string tempHistoTitle2("Common Mode Shift over Events;Event Number;Common Mode Shift [ADC counts]");
+        TH2F * histo2 = new TH2F(this->getHistoNameCMS(ichip).c_str(),tempHistoTitle2.c_str(),nbins,0,NtotalEvt,nbins_adc,b_adcmin,b_adcmax);
+        _rootObjectMap.insert(make_pair(this->getHistoNameCMS(ichip), histo2));
 
-
-
-void AlibavaConstantCommonModeProcessor::bookHistos(){
-
-	string tempHistoName;
-
-	// a histogram showing the corrected signals
-	tempHistoName = getCommonCorrectionName();
-	stringstream tempHistoTitle;
-	tempHistoTitle << tempHistoName << ";ADCs;NumberofEntries";
-
-	TH1D * signalHisto =
-	new TH1D (tempHistoName.c_str(),"",1000,-500,500);
-	_rootObjectMap.insert(make_pair(tempHistoName, signalHisto));
-	string tmp_string = tempHistoTitle.str();
-	signalHisto->SetTitle(tmp_string.c_str());
-	
-	
-	// a histogram showing the corrected signals over events
-	stringstream tempHistoTitle2;
-	tempHistoTitle2 << "Common Mode Correction Values over Events" << ";ADCs;NumberofEntries";
-
-	TH2D * signalHisto2 = new TH2D ("Common Mode Correction Values over Events","",5000,0,500000,1000,-500,500);
-	_rootObjectMap.insert(make_pair("Common Mode Correction Values over Events", signalHisto2));
-	string tmp_string2 = tempHistoTitle2.str();
-	signalHisto2->SetTitle(tmp_string2.c_str());
-
-	streamlog_out ( MESSAGE1 )  << "End of Booking histograms. " << endl; 
+        // shows the common mode shift error (std-dev of the common mode shift mean)
+        std::string tempHistoTitle3("Common Mode Shift Error (std.dev) ;Event Number;#sigma_{Common Mode Shift} [ADC counts]");
+        TH2F * histo3 = new TH2F(this->getHistoNameCMSError(ichip).c_str(),tempHistoTitle3.c_str(),
+                nbins,0,NtotalEvt,100,_adcmin_err,_adcmax_err);
+        _rootObjectMap.insert(make_pair(this->getHistoNameCMSError(ichip), histo3));
+    }
+    
+    streamlog_out ( MESSAGE1 )  << "End of Booking histograms. " << endl; 
 }
