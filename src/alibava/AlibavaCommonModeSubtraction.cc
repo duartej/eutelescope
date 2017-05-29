@@ -151,7 +151,7 @@ void AlibavaCommonModeSubtraction::processRunHeader (LCRunHeader * rdr)
     // set channels to be used (if it is defined)
     setChannelsToBeUsed();
     
-    // if you want
+    // if you want: XXX: does not work
     this->bookHistos(arunHeader->getNoOfEvents());
     
     // set number of skipped events to zero (defined in AlibavaBaseProcessor)
