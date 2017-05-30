@@ -70,6 +70,8 @@ AlibavaCommonModeSubtraction::AlibavaCommonModeSubtraction () :
     _commonmodeerrorCollectionName(ALIBAVA::NOTSET),
     _correctedSignalHistoName("totalcorrectedSignalHisto"),
     _adcmax(200),
+    _adcmin(0),
+    _nbins(200),
     _chanDataHistoName ("Common_and_Pedestal_subtracted_data_channel")
 {
     // modify processor description
@@ -96,6 +98,14 @@ AlibavaCommonModeSubtraction::AlibavaCommonModeSubtraction () :
     registerOptionalParameter ("MaxADCsCountsForHistograms",
             "The max ADCs counts for the common mode which define the ranges of the histograms",
             _adcmax, float(200.0) );
+    
+    registerOptionalParameter ("MinADCsCountsForHistograms",
+            "The min ADCs counts which define the ranges of the histograms",
+            _adcmin, float(0.0) );
+    
+    registerOptionalParameter ("NbinsForHistograms",
+            "The number of bins for the histograms",
+            _nbins, int(200) );
 }
 
 
@@ -322,14 +332,12 @@ void AlibavaCommonModeSubtraction::bookHistos(const int & _NtotalEvt)
     }
     // Calculate the number of bins for the adc related
     // and set the ranges
-    int b_adcmax = _adcmax;
-    int b_adcmin = -1.0*_adcmax;
-    if(_adcmax < 0)
+    if(_adcmax < _adcmin)
     {
-        b_adcmax=b_adcmin;
-        b_adcmin=-1.0*b_adcmax;
+        streamlog_out( ERROR ) << "Inconsistent definition of ranges in the histograms: "
+            << "[XXX TO FiNISH THE MESSAGE]"  << std::endl;
     }
-    int nbins_adc=2.0*_adcmax;
+    const int nbins_adc=_nbins;
 
     EVENT::IntVec chipVec = this->getChipSelection();
     for(auto ichip: chipVec)
@@ -343,7 +351,7 @@ void AlibavaCommonModeSubtraction::bookHistos(const int & _NtotalEvt)
         // a histogram showing the corrected signal over events
         std::string tempHistoTitle2("Corrected Signal per Event;Event Number;ADC corrected [counts]");
         TH2F * histo2 = new TH2F(this->getHistoNameCS(ichip).c_str(),tempHistoTitle2.c_str(),
-                nbins,0,NtotalEvt,nbins_adc,b_adcmin,b_adcmax);
+                nbins,0,NtotalEvt,nbins_adc,_adcmin,_adcmax);
         _rootObjectMap.insert(make_pair(this->getHistoNameCS(ichip), histo2));
 
         // shows the common mode shift error (std-dev of the common mode shift mean)
@@ -365,7 +373,7 @@ void AlibavaCommonModeSubtraction::bookHistos(const int & _NtotalEvt)
             std::string tempHistoName = this->getChanDataHistoName(chipnum,ichan);
             std::string tempHistoTitle(tempHistoName+";ADCs;NumberofEntries");
             TH1F * chanDataHisto=new TH1F(tempHistoName.c_str(),tempHistoTitle.c_str(),
-                    nbins_adc,b_adcmin,b_adcmax);
+                    nbins_adc,_adcmin,_adcmax);
             _rootObjectMap.insert(std::make_pair(tempHistoName, chanDataHisto));
         }
     }   

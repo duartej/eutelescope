@@ -7,6 +7,7 @@
  *  (2017 IFCA-CERN) jorge.duarte.campderros@cern.ch
  *    - Clean and coding style (Allman)
  *
+ *
  */
 
 
@@ -87,10 +88,10 @@ AlibavaPedestalNoiseProcessor::AlibavaPedestalNoiseProcessor() :
             _adcmax, float(1000.0) );
     registerOptionalParameter ("MinADCsCountsForHistograms",
             "The min ADCs counts which define the ranges of the histograms",
-            _adcmax, float(0.0) );
+            _adcmin, float(0.0) );
     registerOptionalParameter ("NbinsForHistograms",
             "The number of bins for the histograms",
-            _adcmin, float(1000) );
+            _nbins, int(1000) );
 
 }
 

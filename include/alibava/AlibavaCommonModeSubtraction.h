@@ -152,6 +152,8 @@ namespace alibava
             
             //! Range for the ADCs in the histograms
             float _adcmax;
+            float _adcmin;
+            int _nbins;
 	
         protected:
             //! The name of the histogram used to calculate common mode
