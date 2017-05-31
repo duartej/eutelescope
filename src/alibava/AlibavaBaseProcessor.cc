@@ -10,9 +10,6 @@
  *
  */
 
-// INTERNAL NOTE : [JDC] Still figuring out when is used this processor...
-//                 so far, it seems like a function pool class
-
 
 // alibava includes ".h"
 #include "AlibavaRunHeaderImpl.h"
@@ -161,66 +158,79 @@ void AlibavaBaseProcessor::setPedestals()
     checkPedestals();
 }
 
-void AlibavaBaseProcessor::checkPedestals(){
+void AlibavaBaseProcessor::checkPedestals()
+{
+    _isPedestalValid = false;
+    _isNoiseValid = false;
+    
+    // first get selected chips
+    EVENT::IntVec selectedchips = getChipSelection();
+    if(selectedchips.size()==0)
+    {
+        streamlog_out(ERROR5)<< "No selected chips found! Couldn't "
+            <<"set the pedestal, noise values!"<<std::endl;
+    }
+    
+    // for each selected chip get and save pedestal and noise values
+    for(const auto & chipnum: selectedchips)
+    {
+        if(getPedestalCollectionName()!= std::string(ALIBAVA::NOTSET)) 
+        {
+            // check pedestal values for this chip
+            const EVENT::FloatVec vec_float = _pedestalMap[chipnum];
+            if( int(vec_float.size()) != ALIBAVA::NOOFCHANNELS)
+            {
+                streamlog_out(ERROR5)<< "The pedestal values for chip "
+                    <<chipnum<<" is not set properly!"<<std::endl;
+            }
+            else
+            {
+                _isPedestalValid = true;
+            }
+        }
+        if(getNoiseCollectionName()!= std::string(ALIBAVA::NOTSET))
+        {
+            // check noise values for this chip
+	    const EVENT::FloatVec vec_float = _noiseMap[chipnum];
+            if( int(vec_float.size()) != ALIBAVA::NOOFCHANNELS)
+            {
+                streamlog_out(ERROR5)<< "The noise values for chip "
+                    <<chipnum<<" is not set properly!"<<std::endl;
+            }
+            else
+            {
+                _isNoiseValid = true;
+            }
+        }
+    }
 	
-	_isPedestalValid = false;
-	_isNoiseValid = false;
+    if(_isPedestalValid)
+    {
+        streamlog_out(MESSAGE5)<< "The pedestal values for all selected chips are valid!"<<std::endl;
+    }
+    else
+    {
+        streamlog_out(WARNING5)<< "The pedestal values for all selected chips are not set properly!"<<std::endl;
+    }
 	
-	// first get selected chips
-	EVENT::IntVec selectedchips = getChipSelection();
-	if(selectedchips.size()==0){
-		streamlog_out(ERROR5)<< "No selected chips found! Couldn't set the pedestal, noise values!"<<endl;
-	}
-	EVENT::FloatVec vec_float;
-	
-	// for each selected chip get and save pedestal and noise values
-	for (unsigned int ichip=0; ichip<selectedchips.size(); ichip++) {
-		int chipnum = selectedchips[ichip];
-		
-		if (getPedestalCollectionName()!= string(ALIBAVA::NOTSET)) {
-			// check pedestal values for this chip
-			vec_float.clear();
-			vec_float = _pedestalMap[chipnum];
-			if( int(vec_float.size()) != ALIBAVA::NOOFCHANNELS){
-				streamlog_out(ERROR5)<< "The pedestal values for chip "<<chipnum<<" is not set properly!"<<endl;
-			}
-			else
-				_isPedestalValid = true;
-		}
-		if(getNoiseCollectionName()!= string(ALIBAVA::NOTSET)){
-			// check noise values for this chip
-			vec_float.clear();
-			vec_float = _noiseMap[chipnum];
-			if( int(vec_float.size()) != ALIBAVA::NOOFCHANNELS){
-				streamlog_out(ERROR5)<< "The noise values for chip "<<chipnum<<" is not set properly!"<<endl;
-			}
-			else
-				_isNoiseValid = true;
-		}
-	}
-	
-	if(_isPedestalValid){
-		streamlog_out(MESSAGE5)<< "The pedestal values for all selected chips are valid!"<<endl;
-	}
-	else{
-		streamlog_out(WARNING5)<< "The pedestal values for all selected chips are not set properly!"<<endl;
-	}
-	
-	if(_isNoiseValid){
-		streamlog_out(MESSAGE5)<< "The noise values for all selected chips are valid!"<<endl;
-	}
-	else{
-		streamlog_out(WARNING5)<< "The noise values for all selected chips are not set properly!"<<endl;
-	}
-	
+    if(_isNoiseValid)
+    {
+        streamlog_out(MESSAGE5)<< "The noise values for all selected chips are valid!"<<std::endl;
+    }
+    else
+    {
+        streamlog_out(WARNING5)<< "The noise values for all selected chips are not set properly!"<<std::endl;
+    }	
 }
 
+// [JDC]: disentangle the pedestals from the noise: TO Be deployed
+// setNoise()
+// checkNoise()
 
 
 ///////////////////////////
 // Pedestal
 ///////////////////////////
-
 // getter and setter for _pedestalCollectionName
 void AlibavaBaseProcessor::setPedestalCollectionName(std::string pedestalCollectionName){
 	_pedestalCollectionName = pedestalCollectionName;
@@ -291,26 +301,25 @@ bool AlibavaBaseProcessor::isNoiseValid(){
 
 // used to set pedestal and noise values
 // Note that chipSelection has to be set first!!!
-void AlibavaBaseProcessor::setCalibration(){
-	// first get selected chips
-	EVENT::IntVec selectedchips = getChipSelection();
-	if(selectedchips.size()==0)
-		streamlog_out(ERROR5)<< "No selected chips found! Couldn't set calibration values!"<<endl;
-	
-	AlibavaPedNoiCalIOManager man;
-	EVENT::FloatVec vec_float;
-	
-	// for each selected chip get and save pedestal and noise values
-	for (unsigned int ichip=0; ichip<selectedchips.size(); ichip++) {
-		int chipnum = selectedchips[ichip];
-		
-		// get charge calibration for this chip
-		vec_float.clear();
-		vec_float = man.getPedNoiCalForChip(_calibrationFile,_chargeCalCollectionName, chipnum);
-		_chargeCalMap.insert(make_pair(chipnum, vec_float));
-		
-	}
-	checkCalibration();
+void AlibavaBaseProcessor::setCalibration()
+{
+    // first get selected chips
+    EVENT::IntVec selectedchips = getChipSelection();
+    if(selectedchips.size()==0)
+    {
+        streamlog_out(ERROR5)<< "No selected chips found! Couldn't set calibration values!"<<std::endl;
+    }
+    
+    AlibavaPedNoiCalIOManager man;
+
+    // for each selected chip get and save pedestal and noise values
+    for(const auto & chipnum: selectedchips)
+    {
+        // get charge calibration for this chip
+        EVENT::FloatVec vec_float= man.getPedNoiCalForChip(_calibrationFile,_chargeCalCollectionName, chipnum);
+        _chargeCalMap.insert(std::make_pair(chipnum, vec_float));
+    }
+    checkCalibration();
 }
 
 void AlibavaBaseProcessor::checkCalibration(){
@@ -373,6 +382,30 @@ float AlibavaBaseProcessor::getChargeCalAtChannel(int chipnum, int channum){
 // Others
 ///////////////////////////
 
+// [JDC] XXX TO BE DEPLOYED
+// Check the _channelsToBeUsed is properly filled
+// bool AlibavaBaseProcessor::isChannelsToBeUsedActive()
+// /* To set of channels to be used
+// ex.The format should be like $ChipNumber:StartChannel-EndChannel$
+//	 ex. $0:5-20$ $0:30-100$ $1:50-70$ means from chip 0 channels
+//     between 5-20 and 30-100, from chip 1 channels between 50-70 will 
+//     be used (all numbers included). the rest will be masked and not used
+//   Note that the numbers should be in ascending order and there should
+//     be no space between two $ character
+//   */
+//if(Global::parameters->isParameterSet(ALIBAVA::CHANNELSTOBEUSED))
+//{
+//    Global::parameters->getStringVals(ALIBAVA::CHANNELSTOBEUSED,_channelsToBeUsed);
+//    return true;
+//}
+//else 
+//{
+//    streamlog_out ( MESSAGE4 ) << "The Global Parameter "
+//        << ALIBAVA::CHANNELSTOBEUSED <<" is not set!" << std::endl;
+//    return false;
+//}
+	
+
 // getter and setter for _chipSelection
 void AlibavaBaseProcessor::setChipSelection(EVENT::IntVec chipselection){
 	_chipSelection = chipselection;
@@ -416,6 +449,10 @@ bool AlibavaBaseProcessor::isMasked(int ichip, int ichan){
 		return 0;
 	}
 }
+
+// [JDC] XXX
+// More useful overloaded??
+//bool AlibavaBaseProcessor::isMasked(const EVENT::FloatVec & rawdatavec
 
 void AlibavaBaseProcessor::setChannelsToBeUsed()
 {
