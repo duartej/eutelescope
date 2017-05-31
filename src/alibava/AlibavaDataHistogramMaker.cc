@@ -66,10 +66,12 @@ AlibavaDataHistogramMaker::AlibavaDataHistogramMaker():
     AlibavaBaseHistogramMaker("AlibavaDataHistogramMaker"),
     // Signal
     _signalHistoName("hSignal"),
+    _signalVsChannelHistoName("hSignal_vs_Channel"),
     _signalVsTimeHistoName("hSignal_vs_Time"),
     _signalVsTempHistoName("hSignal_vs_Temperature"),
     // SNR
     _snrHistoName("hSNR"),
+    _snrVsChannelHistoName("hSNR_vs_Channel"),
     _snrVsTimeHistoName("hSNR_vs_Time"),
     _snrVsTempHistoName("hSNR_vs_Temperature"),
     // Time
@@ -175,7 +177,7 @@ void AlibavaDataHistogramMaker::init ()
     // usually a good idea to
     printParameters ();
     
-    createRulesToChangeXMLValues();
+    //createRulesToChangeXMLValues();
 }
 
 void AlibavaDataHistogramMaker::processRunHeader (LCRunHeader * rdr) 
@@ -189,7 +191,10 @@ void AlibavaDataHistogramMaker::processRunHeader (LCRunHeader * rdr)
     // set total number of events in this run
     _totalNumberOfEvents = arunHeader->getNoOfEvents();
     streamlog_out ( DEBUG1 ) << "N events "<<_totalNumberOfEvents << std::endl;
-	
+    
+    // place it here (otherwise the number of events is not placed)
+    createRulesToChangeXMLValues();
+    
     // get and set selected chips
     setChipSelection(arunHeader->getChipSelection());
 	
@@ -320,10 +325,12 @@ void AlibavaDataHistogramMaker::fillListOfHistos()
     // One per each chip
     // Signal
     addToHistoCheckList_PerChip(_signalHistoName);
+    addToHistoCheckList_PerChip(_signalVsChannelHistoName);
     addToHistoCheckList_PerChip(_signalVsTimeHistoName);
     addToHistoCheckList_PerChip(_signalVsTempHistoName);
     // SNR
     addToHistoCheckList_PerChip(_snrHistoName);
+    addToHistoCheckList_PerChip(_snrVsChannelHistoName);
     addToHistoCheckList_PerChip(_snrVsTimeHistoName);
     addToHistoCheckList_PerChip(_snrVsTempHistoName);
     
@@ -377,11 +384,13 @@ void AlibavaDataHistogramMaker::fillOtherHistos(TrackerDataImpl * trkdata, float
     }
 	
     TH1F * histoSignal = dynamic_cast<TH1F*> (_rootObjectMap[getHistoNameForChip(_signalHistoName,ichip)]);
+    TH2F * histoSignalVsChannel = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_signalVsChannelHistoName,ichip)]);
     TH2F * histoSignalVsTime = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_signalVsTimeHistoName,ichip)]);
     TH2F * histoSignalVsTemp = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_signalVsTempHistoName,ichip)]);
     
     
     TH1F * histoSNR = dynamic_cast<TH1F*> (_rootObjectMap[getHistoNameForChip(_snrHistoName,ichip)]);
+    TH2F * histoSNRVsChannel = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_snrVsChannelHistoName,ichip)]);
     TH2F * histoSNRVsTime = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_snrVsTimeHistoName,ichip)]);
     TH2F * histoSNRVsTemp = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_snrVsTempHistoName,ichip)]);
     
@@ -396,6 +405,7 @@ void AlibavaDataHistogramMaker::fillOtherHistos(TrackerDataImpl * trkdata, float
     	float data = _multiplySignalby*datavec[ichan];
     	
     	histoSignal->Fill(data);
+        histoSignalVsChannel->Fill(ichan,data);
     	histoSignalVsTime->Fill(tdctime,data);
     	histoSignalVsTemp->Fill(temperature,data);
     	
@@ -403,6 +413,7 @@ void AlibavaDataHistogramMaker::fillOtherHistos(TrackerDataImpl * trkdata, float
         {
             const float snr = data/noiseVec[ichan];
             histoSNR->Fill(snr);
+            histoSNRVsChannel->Fill(ichan,snr);
             histoSNRVsTime->Fill(tdctime,snr);
             histoSNRVsTemp->Fill(temperature,snr);
     	}
@@ -464,10 +475,19 @@ void AlibavaDataHistogramMaker::createRulesToChangeXMLValues()
         std::string signalMultipliedby(" ("+std::to_string(_multiplySignalby)+") ");
 
 	this->addToXMLTitle(_signalHistoName, "labelX", "left", signalMultipliedby);
+	this->addToXMLTitle(_signalVsChannelHistoName, "labelY", "left", signalMultipliedby);
 	this->addToXMLTitle(_snrHistoName, "labelX", "left", signalMultipliedby);
+	this->addToXMLTitle(_snrVsChannelHistoName, "labelY", "left", signalMultipliedby);
 	this->addToXMLTitle(_signalVsTimeHistoName, "labelY", "left", signalMultipliedby);
 	this->addToXMLTitle(_snrVsTimeHistoName, "labelY", "left", signalMultipliedby);
 	this->addToXMLTitle(_signalVsTempHistoName, "labelY", "left", signalMultipliedby);
 	this->addToXMLTitle(_snrVsTempHistoName, "labelY", "left", signalMultipliedby);
     }
+    // replace the number of strips event number
+    this->changeXMLVariable(_signalVsChannelHistoName,"xBin",ALIBAVA::NOOFCHANNELS);
+    this->changeXMLVariable(_signalVsChannelHistoName,"xMin",0);
+    this->changeXMLVariable(_signalVsChannelHistoName,"xMax",ALIBAVA::NOOFCHANNELS-1);
+    this->changeXMLVariable(_snrVsChannelHistoName,"xBin",ALIBAVA::NOOFCHANNELS);
+    this->changeXMLVariable(_snrVsChannelHistoName,"xMin",0);
+    this->changeXMLVariable(_snrVsChannelHistoName,"xMax",ALIBAVA::NOOFCHANNELS-1);
 }

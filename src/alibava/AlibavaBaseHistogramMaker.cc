@@ -277,7 +277,7 @@ bool AlibavaBaseHistogramMaker::checkListOfHistosCreatedByXMLFile()
 ///////////
 std::string AlibavaBaseHistogramMaker::getEventHistoName( int eventnum,  int ichip)
 {
-    return s(_eventHistoName+"_"+std::to_string(eventnum)+"_chip"+std::to_string(ichip));
+    return std::string(_eventHistoName+"_"+std::to_string(eventnum)+"_chip"+std::to_string(ichip));
 }
 
 bool AlibavaBaseHistogramMaker::isEventToBePlotted(int eventnum)

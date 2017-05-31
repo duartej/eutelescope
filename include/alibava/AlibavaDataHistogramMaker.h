@@ -156,6 +156,8 @@ namespace alibava {
 		// Signal
 		//! Name of the Signal histogram
 		std::string _signalHistoName;
+		//! Name of the Signal vs. Strip histogram
+		std::string _signalVsChannelHistoName;
 		//! Name of the Signal vs TDCTime histogram
 		std::string _signalVsTimeHistoName;
 		//! Name of the Signal vs Temperature histogram
@@ -164,13 +166,15 @@ namespace alibava {
 		// SNR
 		//! Name of the SNR histogram
 		std::string _snrHistoName;
+		//! Name of the SNR vs Strip histogram
+		std::string _snrVsChannelHistoName;
 		//! Name of the SNR vs TDCTime histogram
 		std::string _snrVsTimeHistoName;
 		//! Name of the SNR vs Temperature histogram
 		std::string _snrVsTempHistoName;
 
 		// Time
-		//! Name of the TDCTime histogram
+		//! Name of the TDCTime 
 		std::string _timeHistoName;
 		//! Name of the TDCTime vs EventNum histogram
 		std::string _timeVsEventNumHistoName;
