@@ -7,6 +7,8 @@
  *  Modified by J. Duarte-Campderros
  *  (2017 IFCA-CERN) jorge.duarte.campderros@cern.ch
  *    - Clean and coding style (Allman)
+ *    - Modify cluster algorithm (improve clearity and
+ *      performance)
  */
 
 // alibava includes ".h"
@@ -42,6 +44,7 @@
 
 // ROOT includes ".h"
 #include "TH1F.h"
+#include "TH1I.h"
 
 // system includes <>
 #include <string>
@@ -49,6 +52,7 @@
 #include <stdlib.h>
 #include <memory>
 #include <algorithm>
+#include <functional>
 
 using namespace std;
 using namespace lcio;
@@ -63,7 +67,8 @@ AlibavaSeedClustering::AlibavaSeedClustering () :
     _isSensitiveAxisX(true),
     _signalPolarity(-1),
     _etaHistoName("hEta"),
-    _clusterSizeHistoName("hClusterSize")
+    _clusterSizeHistoName("hClusterSize"),
+    _clusterSizePerEvtHistoName("hClusterPerEvent")
 {
     // modify processor description
     _description ="AlibavaSeedClustering finds clusters using seed "\
@@ -71,10 +76,10 @@ AlibavaSeedClustering::AlibavaSeedClustering () :
     // first of register the input /output collection
     registerInputCollection(LCIO::TRACKERDATA, "InputCollectionName",
             "Input collection name, it should be pedestal subtracted",
-            _inputCollectionName, string("recodata") );
+            _inputCollectionName, std::string("recodata") );
     registerOutputCollection(LCIO::TRACKERDATA, "OutputCollectionName",
             "Output data collection name",
-            _outputCollectionName, string("alibava_clusters") );
+            _outputCollectionName, std::string("alibava_clusters") );
 	
     // if needed one can change these to optional parameters
     registerProcessorParameter ("NoiseInputFile",
@@ -82,7 +87,7 @@ AlibavaSeedClustering::AlibavaSeedClustering () :
             _pedestalFile , string("pedestal.slcio"));
     registerProcessorParameter ("NoiseCollectionName",
             "Noise collection name, better not to change",
-            _noiseCollectionName, string ("noise"));
+            _noiseCollectionName, std::string ("noise"));
     
     registerProcessorParameter ("SeedSNRCut",
             "The signal/noise ratio that channels have to pass to be considered as seed channel",
@@ -206,6 +211,10 @@ void AlibavaSeedClustering::processEvent (LCEvent * anEvent)
         // Get the clusters of hits (see findClusters function)
         std::vector<AlibavaCluster> clusters = this->findClusters(trkdata);
         
+        // The number of clusters per event histogram
+        TH1I * h = dynamic_cast<TH1I*>(_rootObjectMap[getHistoNameForChip(_clusterSizePerEvtHistoName,i)]);
+        h->Fill(clusters.size());
+    
         // loop over clusters
         for(auto acluster: clusters) 
         {
@@ -264,6 +273,7 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
 	// calculate snr = signal/noise
         const float snr = (_signalPolarity * dataVec[ichan])/noiseVec[ichan];
 	// mask channels that cannot pass NeighbourSNRCut
+        // therefore, we don't need to check it in the next loop
         if(snr < _neighCut)
         {
             channel_can_be_used[ichan]=false;
@@ -279,6 +289,23 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
             { return ((_signalPolarity*dataVec[ichanLeft])/noiseVec[ichanLeft] > 
                 (_signalPolarity*dataVec[ichanRight])/noiseVec[ichanRight]); });
     
+    // Define some functors to be used to provide order to the cluster
+    // finding loop (first left, then right)
+    // -- the pseudo-iterator (with respect the central seed)
+    auto low_strip_functor = [] (int & _index) { --_index; };
+    auto high_strip_functor = [] (int & _index) { ++_index; };
+    std::vector<std::function<void (int&)> > 
+        next_strip_functor{ low_strip_functor, high_strip_functor };
+    
+    // -- the definition of edge of the chip
+    auto low_isEdge_functor = [&] (const int & _index) { return (_index < 0); }; 
+    auto high_isEdge_functor = [&] (const int & _index) { return (_index >= int(channel_can_be_used.size())); }; 
+    std::vector<std::function<bool (const int &)> >
+        isEdge_functor{ low_isEdge_functor, high_isEdge_functor };
+    // -- and the initial neighbour to the central seed. This 
+    //    vector must be used as: seedChan+initial_neighbour[k]
+    const std::vector<int> initial_neighbour = { -1, 1 };
+        
     // JDC: FIXME-- Poor clustering algorithm, try to re-write it
     // now form clusters starting from the seed channel 
     // that has highest SNR
@@ -309,103 +336,56 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
         channel_can_be_used[seedChan]=false;
         
         // We will check if one of the neighbours not bonded. 
-        // If it is not this is not a good cluster we will not use this
+        // If bonded, not use the entire cluster
         bool thereIsNonBondedChan = false;
-	
-        // add channels on the left
-        int ichan = seedChan-1;
-        bool continueSearch = true;
-        while (continueSearch) 
+
+        // Search for clusters, (left direction, right direction)
+        for(unsigned int k=0; k<next_strip_functor.size(); ++k)
         {
-            // first if ichan < 0
-            if (ichan < 0) 
+            // Find the initial neighbour 
+            const int ichanInitial=seedChan+initial_neighbour[k];
+            // start the inclusion of neighbours
+            for(int ichan=ichanInitial;  ; next_strip_functor[k](ichan))
             {
-                // stop search
-                continueSearch = false;
-                // this also means that left neighbour is not bonded
-		thereIsNonBondedChan = true;
-                // then exit while loop
-		break;
+                // first, check if the strip is in the edge
+                if(isEdge_functor[k](ichan))
+                {
+                    // The neighbour is not bonded [JDC??]
+                    thereIsNonBondedChan = true;
+                    // break the loop
+                    break;
+                }
+                // or if the channel is masked
+                if(isMasked(chipnum,ichan))
+                {
+                    // The neighbour is not bonded [JDC??]
+                    thereIsNonBondedChan=true;
+                    break;
+                }
+                // And the channel if possible
+                if(channel_can_be_used[ichan])
+                {
+                    acluster.add(ichan, dataVec[ichan]);
+                    // and mask it so that it will not be added to any other cluster
+                    channel_can_be_used[ichan]=false;
+                }
+                else
+                {
+                    // if it is not possible to add it, the cluster is over
+                    break;
+                }
             }
-            
-            // if chan masked
-            if (isMasked(chipnum,ichan)==true) 
-            {
-                // this means that it is not bonded.
-		thereIsNonBondedChan = true;
-                // then we are sure that there is no other channel on the left
-		break;
-                // We will still form the cluster but we will not use this cluster.
-		// the members on the right that should be in this cluster, should not be used by some other cluster.
-		// so to mark them not to be used we will continue search
-            }
-            
-            // now check if this channel can be added to the cluster
-	    if ( channel_can_be_used[ichan] )
-            {
-                // if yes, add it
-		acluster.add(ichan, dataVec[ichan]);
-                // and mask it so that it will not be added to any other cluster
-		channel_can_be_used[ichan]=false;
-            }
-            else
-            {
-                // if you cannot use this channel there is no other channel on the left
-		break;
-            }
-            // go to the next channel on left
-            --ichan;
-        }
-		
-	continueSearch = true;
-	ichan = seedChan+1;
-	// add channels on right
-	while (continueSearch) 
-        {
-            // first if ichan < 0
-	    if (ichan >= int(channel_can_be_used.size()) ) 
-            {
-                // stop search
-		continueSearch = false;
-                // this also means that right neighbour is not bonded
-		thereIsNonBondedChan = true;
-                // then exit while loop
-		break;
-            }
-	    // if chan masked
-	    if (isMasked(chipnum,ichan)==true) 
-            {
-                // this means that it is not bonded.
-		thereIsNonBondedChan = true;
-                // then we are sure that there is no other channel on the left
-		break;
-            }
-            
-            // now check if this channel can be added to the cluster
-            if ( channel_can_be_used[ichan] )
-            {
-                // if yes, add it
-		acluster.add(ichan, dataVec[ichan]);
-                // and mask it so that it will not be added to any other cluster
-		channel_can_be_used[ichan]=false;
-            }
-            else
-            {
-                // if you cannot use this channel there is no other channel on the right
-		break;
-            }
-            // go to the next channel on right
-	    ++ichan;
         }
 	
 	// now if there is no neighbour not bonded
 	if(thereIsNonBondedChan == false)
         {
             // fill the histograms and add them to the cluster vector
-            fillHistos(acluster);
+            this->fillHistos(acluster);
             clusterVector.push_back(acluster);
         }
     }
+    
     return clusterVector;
 }
 
@@ -498,39 +478,39 @@ void AlibavaSeedClustering::fillHistos(AlibavaCluster anAlibavaCluster)
     hClusterSize->Fill( clusterSize );	
 }
 
-void AlibavaSeedClustering::bookHistos(){
+void AlibavaSeedClustering::bookHistos()
+{
+    AIDAProcessor::tree(this)->cd(this->name());
+    
+    EVENT::IntVec chipSelection = getChipSelection();
+    for(const auto & ichip: chipSelection) 
+    {
+        // Clustersize histogram
+	std::string histoName(getHistoNameForChip(_clusterSizeHistoName,ichip));
+        std::string title("Cluster Size (chip "+to_string(ichip)+string(");Cluster Size;Entries"));
+        TH1F * hClusterSize = new TH1F(histoName.c_str(),title.c_str(),10, 0, 10);
+        _rootObjectMap.insert(make_pair(histoName, hClusterSize));
+        
+        // Clustersize per event
+	histoName=getHistoNameForChip(_clusterSizePerEvtHistoName,ichip);
+        title = "Number of cluster per Event (chip "+to_string(ichip)+string(");Cluster Size;Entries");
+        TH1I * hClusterSizePerEvt = new TH1I(histoName.c_str(),title.c_str(),10, 0, 10);
+        _rootObjectMap.insert(make_pair(histoName, hClusterSizePerEvt));
+        
+        // Eta histogram ClusterSize > 1
+        histoName = getHistoNameForChip(_etaHistoName,ichip);
+	title = std::string("Eta distribution ClusterSize > 1 (chip "+to_string(ichip)+string(");Eta;Number of Entries"));
+        TH1F * hEta = new TH1F (histoName.c_str(),title.c_str(),100, -0.1, 1.1);
+	_rootObjectMap.insert(make_pair(histoName, hEta));
 	
-	AIDAProcessor::tree(this)->cd(this->name());
-	
-	EVENT::IntVec chipSelection = getChipSelection();
-	string histoName;
-	string title;
-	for ( unsigned int i=0; i<chipSelection.size(); i++) {
-		int ichip=chipSelection[i];
-		
-		// Clustersize histogram
-		histoName = getHistoNameForChip(_clusterSizeHistoName,ichip);
-		TH1F * hClusterSize = new TH1F (histoName.c_str(),"",10, 0, 10);
-		title = string("Cluster Size (chip ") +to_string(ichip)+string(");Number of Entries;Cluster Size");
-		hClusterSize->SetTitle(title.c_str());
-		_rootObjectMap.insert(make_pair(histoName, hClusterSize));
-		
-		// Eta histogram ClusterSize > 1
-		histoName = getHistoNameForChip(_etaHistoName,ichip);
-		TH1F * hEta = new TH1F (histoName.c_str(),"",100, -0.1, 1.1);
-		title = string("Eta distribution ClusterSize > 1 (chip ") +to_string(ichip)+string(");Number of Entries;Eta");
-		hEta->SetTitle(title.c_str());
-		_rootObjectMap.insert(make_pair(histoName, hEta));
-		
-	} // end of loop over selected chips
+    } // end of loop over selected chips
 	
 	streamlog_out ( MESSAGE1 )  << "End of Booking histograms. " << endl;
 }
 
-string AlibavaSeedClustering::getHistoNameForChip(string histoName, int ichip){
-	stringstream s;
-	s<< histoName <<"_chip" << ichip;
-	return s.str();
+std::string AlibavaSeedClustering::getHistoNameForChip(string histoName, int ichip)
+{
+    return std::string(histoName+"_chip"+std::to_string(ichip));
 }
 
 

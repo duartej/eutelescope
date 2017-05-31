@@ -171,6 +171,9 @@ namespace alibava
     	    
     	    // Cluster Size
     	    std::string _clusterSizeHistoName;
+    	    
+            // Cluster Size
+    	    std::string _clusterSizePerEvtHistoName;
     };
     //! A global instance of the processor
     AlibavaSeedClustering gAlibavaSeedClustering;
