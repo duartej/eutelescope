@@ -306,7 +306,6 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
     //    vector must be used as: seedChan+initial_neighbour[k]
     const std::vector<int> initial_neighbour = { -1, 1 };
         
-    // JDC: FIXME-- Poor clustering algorithm, try to re-write it
     // now form clusters starting from the seed channel 
     // that has highest SNR
     int clusterID = 0;
@@ -324,6 +323,13 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
         AlibavaCluster acluster;
         acluster.setChipNum(chipnum);
         acluster.setSeedChanNum(seedChan);
+        // [JDC] Here there is a problem: calculate eta BEFORE! 
+        //       But the algorithm for calculate the cluster is
+        //       made afterwards... It seems unlogical
+        //       If the calculation is done now, it's going to take into 
+        //       account the possibility of charge sharing between
+        //       adjacents strips (even if they are not included 
+        //       in the cluster)
         acluster.setEta( this->calculateEta(trkdata,seedChan) );
         acluster.setIsSensitiveAxisX(_isSensitiveAxisX);
         acluster.setSignalPolarity(_signalPolarity);

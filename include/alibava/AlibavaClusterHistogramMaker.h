@@ -154,35 +154,17 @@ namespace alibava {
 		// Histogram Names //
 		/////////////////////
 		
-		// Eta histogram name for ClusterSize > 1
-		std::string _etaHistoName;
-		
-		// Eta histogram name for ClusterSize == 2
-		std::string _etaHistoNameCS2;
-		
-		// Eta histogram name for ClusterSize == 3
-		std::string _etaHistoNameCS3;
-		
-		// Eta histogram name for ClusterSize == 4
-		std::string _etaHistoNameCS4;
-		
-		// Eta histogram name for ClusterSize == 5
-		std::string _etaHistoNameCS5;
-		
-		// Eta histogram name for ClusterSize > 5
-		std::string _etaHistoNameCSgt5;
-			
-		// Cluster Size
-		std::string _clusterSizeHistoName;
-		
-		// Hit Amplitude 
-		std::string _hitAmplitudeHistoName;
+                // Cluster size vs. Hit Amplitude
+                std::string _clusterSizeVsHitAmplitudeHistoName;
 		
 		// Eta vs Center of gravity
 		std::string _etaVSCoG;
 
 		// Eta vs Cluster size
 		std::string _etaVSClusterSize;
+
+                // Cluster size vs. Center of Gravity
+                std::string _clusterSizeVsCoG;
 	};
 	
 	//! A global instance of the processor
