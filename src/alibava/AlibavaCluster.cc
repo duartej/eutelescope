@@ -23,7 +23,8 @@
 
 // system includes <>
 #include <iomanip>
-//#include <map>
+#include <map>
+#include <iterator>
 
 
 using namespace std;
@@ -226,6 +227,51 @@ float AlibavaCluster::getCenterOfGravity()
     }
 	
     return weightedSum/totalsignal;
+}
+
+// 
+float AlibavaCluster::getUnbiasedCenterPosition()
+{
+    // Note as it is considered number of channels, the
+    // pitch is set to 1 unity (the separation between 
+    // two channels)
+    
+    if(getClusterSize()==1)
+    {
+        return float(getSeedChanNum());
+    }
+
+    // The center is the seed
+    float xrec = float(getSeedChanNum());
+    // find the edge channel using a map order (low, i.e left 
+    // to high, i.e right)
+    std::map<int,int> channelMember;
+    for(int imember=0; imember < getClusterSize(); ++imember)
+    {
+        channelMember.emplace(getChanNum(imember),imember);
+    }
+    // The edges 
+    const int leftChannel  = channelMember.begin()->second;
+    const float signalLeft = getSignalPolarity()*getSignal(leftChannel);
+
+    const int rightChannel  = channelMember.end()->second;
+    const float signalRight = getSignalPolarity()*getSignal(rightChannel);
+    
+    // special 2-clusters
+    if(getClusterSize()==2)
+    {
+        return xrec+(signalRight-signalLeft)/(3.0*std::max(signalLeft,signalRight));
+    }
+
+    float partialSignal = 0.0;
+    // adding up all the charges but the edges strips
+    for(auto it = std::next(channelMember.begin()); it != std::prev(channelMember.end()); ++it)
+    {
+        partialSignal += getSignalPolarity()*getSignal(it->second);
+    }
+    partialSignal /= float(getClusterSize()-2);
+
+    return xrec+(signalRight-signalLeft)/(2.0*partialSignal);  
 }
 
 int AlibavaCluster::getChanNum(int imember) 

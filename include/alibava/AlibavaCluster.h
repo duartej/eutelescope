@@ -48,6 +48,12 @@ namespace alibava
 		void print();
 		
 		float getCenterOfGravity();
+                 
+                // Calculate the center position of the cluster
+                // using an unbiased center position finder algorithm
+                // Head-tail algorithm 
+                // (R. Turchetta, “Spatial resolution of silicon microstrip detectors”, 1993)
+                float getUnbiasedCenterPosition();
 		
 		void createTrackerData(lcio::TrackerDataImpl * alibavaCluster);
 		

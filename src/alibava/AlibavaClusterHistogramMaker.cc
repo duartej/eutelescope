@@ -66,8 +66,10 @@ AlibavaClusterHistogramMaker::AlibavaClusterHistogramMaker():
     // List of Histogram names, initialized here.
     _clusterSizeVsHitAmplitudeHistoName("hClusterSizeVsHitAmplitude"),
     _etaVSCoG("hEta_vs_CoG"),
+    _etaVSUCPFA("hEta_vs_UCPFA"),
     _etaVSClusterSize("hEta_vs_ClusterSize"),
-    _clusterSizeVsCoG("hClusterSize_vs_CoG")
+    _clusterSizeVsCoG("hClusterSize_vs_CoG"),
+    _clusterSizeVsUCPFA("hClusterSize_vs_UCPFA")
 {
     // modify processor description
     _description ="AlibavaClusterHistogramMaker takes some "\
@@ -236,8 +238,10 @@ void AlibavaClusterHistogramMaker::fillListOfHistos()
     // One per each chip
     addToHistoCheckList_PerChip(_clusterSizeVsHitAmplitudeHistoName);
     addToHistoCheckList_PerChip(_etaVSCoG);
+    addToHistoCheckList_PerChip(_etaVSUCPFA);
     addToHistoCheckList_PerChip(_etaVSClusterSize);
     addToHistoCheckList_PerChip(_clusterSizeVsCoG);
+    addToHistoCheckList_PerChip(_clusterSizeVsUCPFA);
     
     //////////////////////
     // One for all chips
@@ -369,7 +373,15 @@ void AlibavaClusterHistogramMaker::fillHistos(TrackerDataImpl * trkdata )
     histo2 = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_etaVSCoG,ichip)]);
     histo2->Fill(CoG, eta);
     
-    // center of gravity
+    // Using the Unbiased center position
+    const float UCPFA = anAlibavaCluster.getUnbiasedCenterPosition();
+    histo2 = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_etaVSUCPFA,ichip)]);
+    histo2->Fill(UCPFA, eta);
+    
+    histo2 = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_clusterSizeVsUCPFA,ichip)]);
+    histo2->Fill(UCPFA, clusterSize);
+    
+    // cluster size
     histo2 = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_etaVSClusterSize,ichip)]);
     histo2->Fill(clusterSize, eta);
     

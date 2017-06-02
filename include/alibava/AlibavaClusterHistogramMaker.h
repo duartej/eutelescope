@@ -159,12 +159,18 @@ namespace alibava {
 		
 		// Eta vs Center of gravity
 		std::string _etaVSCoG;
+		
+                // Eta vs Unbiased Position Cluster Finding Algorithm
+		std::string _etaVSUCPFA;
 
 		// Eta vs Cluster size
 		std::string _etaVSClusterSize;
 		
                 // Cluster size vs. Center of Gravity
                 std::string _clusterSizeVsCoG;
+                
+                // Cluster size vs. Unbiased Position cluster Finding Algorithm
+                std::string _clusterSizeVsUCPFA;
 	};
 	
 	//! A global instance of the processor
