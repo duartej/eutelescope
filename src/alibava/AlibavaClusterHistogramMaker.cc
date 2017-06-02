@@ -419,35 +419,34 @@ void AlibavaClusterHistogramMaker::bookEventHisto(int eventnum)
             // in any case here is labelY
             sp+="Signal (ADCs)";
             eventHisto->SetTitle(sp.c_str());
-            _rootObjectMap.insert(make_pair(histoName, eventHisto));
+            _rootObjectMap.insert(std::make_pair(histoName, eventHisto));
         }
     } // end of loop over selected chips
 }
 
 // You have to define what fillEventHisto will do
-void AlibavaClusterHistogramMaker::fillEventHisto(int eventnum, TrackerDataImpl * trkdata){
-	//noiseHisto->SetBinContent(ichan+1,noiVec[ichan]);
+void AlibavaClusterHistogramMaker::fillEventHisto(int eventnum, TrackerDataImpl * trkdata)
+{
+    //noiseHisto->SetBinContent(ichan+1,noiVec[ichan]);
 	
-	//	streamlog_out (DEBUG1) << "Plotting Event "<< eventnum<<endl;
-	AlibavaCluster anAlibavaCluster(trkdata);
-	int ichip = anAlibavaCluster.getChipNum();
-
+    //	streamlog_out (DEBUG1) << "Plotting Event "<< eventnum<<endl;
+    AlibavaCluster anAlibavaCluster(trkdata);
+    const int ichip = anAlibavaCluster.getChipNum();
 	
-	string histoName =getEventHistoName(eventnum,ichip);
-	if (!doesRootObjectExists(histoName)) {
-		streamlog_out(ERROR3)<<"Root object for Event "<<eventnum<<" doesn't exists!"<<endl;
-		return;
-	}
-	TH1F * histo = dynamic_cast<TH1F*> (_rootObjectMap[histoName]);
+    std::string histoName =getEventHistoName(eventnum,ichip);
+    if (!doesRootObjectExists(histoName)) 
+    {
+        streamlog_out(ERROR3)<<"Root object for Event "<<eventnum<<" doesn't exists!"<<endl;
+        return;
+    }
+    TH1F * histo = dynamic_cast<TH1F*> (_rootObjectMap[histoName]);
 	
-	// convert the trkdata to AlibavaCluster
-	int Nmembers = anAlibavaCluster.getClusterSize();
-	for (int imember=0; imember<Nmembers; imember++) {
-		int channelNum = anAlibavaCluster.getChanNum(imember);
-		float signal = _multiplySignalby * anAlibavaCluster.getSignal(imember);
-		histo->SetBinContent(channelNum+1, signal);
-	}
-	
-	
-	
+    // convert the trkdata to AlibavaCluster
+    const int Nmembers = anAlibavaCluster.getClusterSize();
+    for (int imember=0; imember<Nmembers; imember++) 
+    {
+        int channelNum = anAlibavaCluster.getChanNum(imember);
+        float signal = _multiplySignalby * anAlibavaCluster.getSignal(imember);
+        histo->SetBinContent(channelNum+1, signal);
+    }
 }
