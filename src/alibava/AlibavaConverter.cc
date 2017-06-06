@@ -224,7 +224,8 @@ void AlibavaConverter::readDataSource(int /* numEvents */)
     runHeader->setRunNumber(_runNumber);
     runHeader->setChipSelection(_chipSelection);
 	
-    // get number of events from header
+    // get number of events from header (only valid if the event is
+    // different from calibration type)
     std::string tmpstring = getSubStringUpToChar(header,";",0);
     int noofevents = atoi(tmpstring.c_str());
     runHeader->setNoOfEvents(noofevents);
@@ -255,20 +256,29 @@ void AlibavaConverter::readDataSource(int /* numEvents */)
         }
 	
         unsigned int headerCode, eventTypeCode=0;
+        bool breaktheloop=false;
         do
         {
             infile.read(reinterpret_cast< char *> (&headerCode), sizeof(unsigned int));
             if(infile.bad() || infile.eof())
             {
-                return;
+                // [JDC] End of file reached, so breaking the loop
+                // in a clean way
+                breaktheloop=true;
+                break;
             }
 	    eventTypeCode = (headerCode>>16) & 0xFFFF;
         } while( eventTypeCode != 0xcafe );
+        if(breaktheloop)
+        {
+            // [JDC] Breaking the loop in a clean way
+            break;
+        }
 	
         eventTypeCode = headerCode & 0x0fff;
 
         unsigned int userEventTypeCode = headerCode & 0x1000;
-        if (userEventTypeCode)
+        if(userEventTypeCode)
         {	
             streamlog_out( ERROR5 )<<" Unexpected data type found (type= User type). Data is not saved"<<std::endl;
             return;
@@ -408,14 +418,14 @@ void AlibavaConverter::readDataSource(int /* numEvents */)
         ++eventCounter;
         // Free memory
         delete anEvent;
-    }while ( !(infile.bad() || infile.eof()) );
+    }while( !(infile.bad() || infile.eof()) );
     
     infile.close();
     if(_stopEventNum!=-1 && eventCounter<_stopEventNum)
     {
         streamlog_out( MESSAGE5 )<<" Stopped before reaching StopEventNum: "
             <<_stopEventNum<<". The file has "<<eventCounter<<" events."<<std::endl;
-    }	
+    }
 }
 
 
