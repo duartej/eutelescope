@@ -459,8 +459,7 @@ void AlibavaCalibrateProcessor::bookHistos()
 // Get the injected pulse (in electrons)
 float AlibavaCalibrateProcessor::getInjectedCharge(const int & eventNumber)
 {
-    // WARNING: XXX ---< maybe use std::modf function??
-    // [XXX : Not sure if this is the proper algorithm!] 
+    // WARNING: XXX ---> maybe use std::modf function??
     return _initialCharge+_deltaCharge*((eventNumber)/(_nSamplesPerPulse));
 }
 
