@@ -38,7 +38,11 @@ namespace alibava
 		
 		int getChanNum(int imember);
 		float getSignal(int imember);
+                // Overload function to obtain the signal in electrons
+                float getSignal(const int & imember,const std::vector<float> calibration);
 		float getTotalSignal();
+                // Overload function to obtain the signal in electrons
+		float getTotalSignal(const std::vector<float> calibration);
 		float getTotalSNR(EVENT::FloatVec noiseVec);
 		
 		

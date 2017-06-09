@@ -294,6 +294,23 @@ float AlibavaCluster::getSignal(int imember)
     return _signals[imember];
 }
 
+// Overload function getting electrons (instead of ADC)
+float AlibavaCluster::getSignal(const int & imember, const std::vector<float> calv)
+{
+    if(imember >= getClusterSize()) 
+    {
+        streamlog_out(ERROR5)<< "Not enough members in this AlibavaCluster"<<std::endl;
+        return 0;
+    }
+    // Check the validity of calv
+    if(calv.size() != ALIBAVA::NOOFCHANNELS)
+    {
+        streamlog_out(ERROR5)<< "Inconsistency in the calibrated vector"<<std::endl;
+        return 0;
+    }
+    return _signals[imember]*calv[imember];
+}
+
 float AlibavaCluster::getTotalSNR(FloatVec noiseVec) 
 {
     float snr_total = 0;
@@ -316,6 +333,24 @@ float AlibavaCluster::getTotalSignal()
     for(int imember=0; imember<getClusterSize(); imember++)
     {
         totalsignal += _signals[imember];
+    }
+    return totalsignal;
+}
+
+// Overload for the electrons
+float AlibavaCluster::getTotalSignal(const std::vector<float> calv)
+{ 
+    // Check the validity of calv
+    if(calv.size() != ALIBAVA::NOOFCHANNELS)
+    {
+        streamlog_out(ERROR5)<< "Inconsistency in the calibrated vector"<<std::endl;
+        return 0;
+    }
+ 
+    float totalsignal=0;
+    for(int imember=0; imember<getClusterSize(); imember++)
+    {
+        totalsignal += _signals[imember]*calv[imember];
     }
     return totalsignal;
 }
