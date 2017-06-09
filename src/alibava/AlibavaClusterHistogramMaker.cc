@@ -219,6 +219,9 @@ void AlibavaClusterHistogramMaker::processRunHeader (LCRunHeader * rdr)
         plotPedestalAndNoise();
     }
     
+    // set calibration if available
+    this->setCalibration();
+    
     // reads and creates the histograms defined in HistoXMLFile
     this->bookHistos();
     
@@ -242,6 +245,7 @@ void AlibavaClusterHistogramMaker::fillListOfHistos()
     addToHistoCheckList_PerChip(_etaVSClusterSize);
     addToHistoCheckList_PerChip(_clusterSizeVsCoG);
     addToHistoCheckList_PerChip(_clusterSizeVsUCPFA);
+    addToHistoCheckList_PerChip(_calChargeHistoName);
     
     //////////////////////
     // One for all chips
@@ -364,6 +368,14 @@ void AlibavaClusterHistogramMaker::fillHistos(TrackerDataImpl * trkdata )
     // by this one)
     TH2F *histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_clusterSizeVsHitAmplitudeHistoName,ichip)]);
     histo2->Fill( clusterSize,_multiplySignalby * anAlibavaCluster.getTotalSignal());
+
+    // if calibration was defined
+    if( _chargeCalMap.size() > 0)
+    {
+        TH1F * hprov = dynamic_cast<TH1F*>(_rootObjectMap[getHistoNameForChip(_calChargeHistoName,ichip)]);
+        hprov->Fill(_multiplySignalby*anAlibavaCluster.getTotalSignal(_chargeCalMap[ichip])*1e-3);
+    }
+    
     
     // Then fill eta histograms
     const float eta = anAlibavaCluster.getEta();
