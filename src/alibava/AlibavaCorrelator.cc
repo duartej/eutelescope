@@ -38,8 +38,8 @@
 
 
 // ROOT includes ".h"
-#include "TH1D.h"
-#include "TH2D.h"
+#include "TH1F.h"
+#include "TH2F.h"
 #include "TProfile.h"
 
 // system includes <>
@@ -58,44 +58,39 @@ using namespace alibava;
 
 
 AlibavaCorrelator::AlibavaCorrelator () :
-AlibavaBaseHistogramMaker("AlibavaCorrelator"),
-// List of Histogram names, initialized here. As an example we put only 2
-_hHitPosX("hHitPosX"),
-_hHitPosY("hHitPosY"),
-_hCorX("hCorX"),
-_hCorY("hCorY"),
-_hSyncX("hSyncX"),
-_hSyncY("hSyncY"),
-_detectorIDs()
+    AlibavaBaseHistogramMaker("AlibavaCorrelator"),
+    // List of Histogram names, initialized here. As an example we put only 2
+    _hHitPosX("hHitPosX"),
+    _hHitPosY("hHitPosY"),
+    _hCorX("hCorX"),
+    _hCorY("hCorY"),
+    _hSyncX("hSyncX"),
+    _hSyncY("hSyncY"),
+    _detectorIDs()
 {
-	
-	// modify processor description
-	_description =
-	"AlibavaCorrelator gets hit collection and plots correlation histograms ";
-	
-	
-	// first of register the input collection
-	registerInputCollection (LCIO::TRACKERHIT, "InputCollectionName",
-									 "Input raw data collection name",
-									 _inputCollectionName, string("rawdata") );
-	// Details about HistoXMLFile
-	registerProcessorParameter ("HistoXMLFile",
-										 "The path of XML file where the histograms are defined",
-										 _histoXMLFileName , string("AlibavaHistoList.xml"));
-	
-	registerProcessorParameter ("TopTagInXMLFile",
-										 "The top tag in HistoXMLFile",
-										 _topTag , string("AlibavaHistoList"));
-	
-	registerProcessorParameter ("TagToProcess",
-										 "The tag in TopTagInXMLFile. This processor will only consider the histogram definitions inside this tag. This tag should be inside <TopTagInXMLFile> ... <TopTagInXMLFile/>",
-										 _tagToProcess , string("myAlibavaCorrelator"));
-	
-	registerProcessorParameter ("DetectorIDs",
-										 "The list of detector IDs",
-										 _detectorIDs , IntVec());
-	
-	
+    // modify processor description
+    _description = "AlibavaCorrelator gets hit collection and plots correlation histograms ";
+    
+    // first of register the input collection
+    registerInputCollection (LCIO::TRACKERHIT, "InputCollectionName",
+            "Input raw data collection name",
+            _inputCollectionName, string("rawdata") );
+    
+    // Details about HistoXMLFile
+    registerProcessorParameter ("HistoXMLFile",
+            "The path of XML file where the histograms are defined",
+            _histoXMLFileName , string("AlibavaHistoList.xml"));
+
+    registerProcessorParameter ("TopTagInXMLFile",
+            "The top tag in HistoXMLFile",_topTag , string("AlibavaHistoList"));
+    
+    registerProcessorParameter ("TagToProcess", "The tag in TopTagInXMLFile. This"\
+            " processor will only consider the histogram definitions inside this tag."\
+            " This tag should be inside <TopTagInXMLFile> ... <TopTagInXMLFile/>",
+            _tagToProcess , string("myAlibavaCorrelator"));
+    
+    registerProcessorParameter ("DetectorIDs",
+            "The list of detector IDs", _detectorIDs , IntVec());
 }
 
 
@@ -208,20 +203,20 @@ void AlibavaCorrelator::fillListOfHistos(){
 	
 }
 
-void AlibavaCorrelator::createClones_hHitPos(string histoName){
-	
-	AIDAProcessor::tree(this)->cd(this->name());
-	AIDAProcessor::tree(this)->cd(getInputCollectionName().c_str());
-	TH1D * h = dynamic_cast<TH1D*> (_rootObjectMap[histoName]);
-	
-	streamlog_out ( MESSAGE1 )  << "hist "<< histoName<<" "<<h << endl;
-	AIDAProcessor::tree(this)->mkdir(histoName.c_str());
-	AIDAProcessor::tree(this)->cd(histoName.c_str());
-	
-	for (unsigned int idet=0; idet<_detectorIDs.size(); idet++) {
+void AlibavaCorrelator::createClones_hHitPos(string histoName)
+{
+    AIDAProcessor::tree(this)->cd(this->name());
+    AIDAProcessor::tree(this)->cd(getInputCollectionName().c_str());
+    TH1F * h = dynamic_cast<TH1F*> (_rootObjectMap[histoName]);
+    
+    streamlog_out ( MESSAGE1 )  << "hist "<< histoName<<" "<<h << std::endl;
+    AIDAProcessor::tree(this)->mkdir(histoName.c_str());
+    AIDAProcessor::tree(this)->cd(histoName.c_str());
+    
+    for (unsigned int idet=0; idet<_detectorIDs.size(); idet++) {
 		int detID = _detectorIDs[idet];
 		string newHistoName = getHistoNameForDetector(histoName, detID);
-		TH1D * hnew = (TH1D*)h->Clone( newHistoName.c_str() );
+		TH1F * hnew = (TH1F*)h->Clone( newHistoName.c_str() );
 		
 		string title = hnew->GetTitle();
 		title = title + string(" (det ") + to_string(detID) + string(")");
@@ -232,7 +227,7 @@ void AlibavaCorrelator::createClones_hHitPos(string histoName){
 void AlibavaCorrelator::createClones_hCor(string histoName){
 	AIDAProcessor::tree(this)->cd(this->name());
 	AIDAProcessor::tree(this)->cd(getInputCollectionName().c_str());
-	TH2D * h = dynamic_cast<TH2D*> (_rootObjectMap[histoName]);
+	TH2F * h = dynamic_cast<TH2F*> (_rootObjectMap[histoName]);
 	
 	AIDAProcessor::tree(this)->mkdir(histoName.c_str());
 	AIDAProcessor::tree(this)->cd(histoName.c_str());
@@ -244,7 +239,7 @@ void AlibavaCorrelator::createClones_hCor(string histoName){
 			int corDetID = _detectorIDs[iCorDet]; // correlated detector id
 			
 			string newHistoName = getHistoNameForDetector(histoName, detID, corDetID);
-			TH2D * hnew = (TH2D*)h->Clone( newHistoName.c_str() );
+			TH2F * hnew = (TH2F*)h->Clone( newHistoName.c_str() );
 			string title = hnew->GetXaxis()->GetTitle();
 			title = title + string(" det") + to_string(detID);
 			
@@ -255,10 +250,11 @@ void AlibavaCorrelator::createClones_hCor(string histoName){
 		}
 	}
 }
-void AlibavaCorrelator::createClones_hSync(string histoName){
-	AIDAProcessor::tree(this)->cd(this->name());
+void AlibavaCorrelator::createClones_hSync(string histoName)
+{
+    AIDAProcessor::tree(this)->cd(this->name());
 	AIDAProcessor::tree(this)->cd(getInputCollectionName().c_str());
-	TH2D * h = dynamic_cast<TH2D*> (_rootObjectMap[histoName]);
+	TH2F * h = dynamic_cast<TH2F*> (_rootObjectMap[histoName]);
 	
 	AIDAProcessor::tree(this)->mkdir(histoName.c_str());
 	AIDAProcessor::tree(this)->cd(histoName.c_str());
@@ -269,7 +265,7 @@ void AlibavaCorrelator::createClones_hSync(string histoName){
 		for (unsigned int iCorDet=idet+1; iCorDet<_detectorIDs.size(); iCorDet++) {
 			int corDetID = _detectorIDs[iCorDet]; // correlated detector id
 			string newHistoName = getHistoNameForDetector(histoName, detID, corDetID);
-			TH2D * hnew = (TH2D*)h->Clone( newHistoName.c_str() );
+			TH2F * hnew = (TH2F*)h->Clone( newHistoName.c_str() );
 			string title = hnew->GetYaxis()->GetTitle();
 			title = title + string(" d") + to_string(detID) + string(" - d")+to_string(corDetID);
 			
@@ -278,25 +274,25 @@ void AlibavaCorrelator::createClones_hSync(string histoName){
 	}
 }
 
-void AlibavaCorrelator::bookHistos(){
-	// create histograms defined in HistoXMLFile
-	processHistoXMLFile();
+void AlibavaCorrelator::bookHistos()
+{
+    // create histograms defined in HistoXMLFile
+    processHistoXMLFile();
+
+    // hX plots
+    createClones_hHitPos(_hHitPosX);
+    // hY plots
+    createClones_hHitPos(_hHitPosY);
+    // hCorX
+    createClones_hCor(_hCorX);
+    // hCorY
+    createClones_hCor(_hCorY);
+    // hSyncX
+    createClones_hSync(_hSyncX);
+    // hSyncY
+    createClones_hSync(_hSyncY);
 	
-	
-	// hX plots
-	createClones_hHitPos(_hHitPosX);
-	// hY plots
-	createClones_hHitPos(_hHitPosY);
-	// hCorX
-	createClones_hCor(_hCorX);
-	// hCorY
-	createClones_hCor(_hCorY);
-	// hSyncX
-	createClones_hSync(_hSyncX);
-	// hSyncY
-	createClones_hSync(_hSyncY);
-	
-	streamlog_out ( MESSAGE1 )  << "End of Booking histograms. " << endl;
+    streamlog_out ( MESSAGE1 )  << "End of Booking histograms. " << std::endl;
 }
 
 bool AlibavaCorrelator::isInDetectorIDsList(int detID){
@@ -344,11 +340,11 @@ void AlibavaCorrelator::processEvent (LCEvent * anEvent) {
 			string histoName;
 			// fill hX
 			histoName = getHistoNameForDetector(_hHitPosX, detID);
-			TH1D * hX = dynamic_cast<TH1D*> (_rootObjectMap[ histoName ]);
+			TH1F * hX = dynamic_cast<TH1F*> (_rootObjectMap[ histoName ]);
 			hX->Fill(pos[0]);
 			// fill hY
 			histoName = getHistoNameForDetector(_hHitPosY, detID);
-			TH1D * hY = dynamic_cast<TH1D*> (_rootObjectMap[ histoName ]);
+			TH1F * hY = dynamic_cast<TH1F*> (_rootObjectMap[ histoName ]);
 			hY->Fill(pos[1]);
 			
 			// correlation plots
@@ -361,19 +357,19 @@ void AlibavaCorrelator::processEvent (LCEvent * anEvent) {
 				const double* anotherPos = anotherHit->getPosition();
 				
 				histoName = getHistoNameForDetector(_hCorX, detID, anotherDetID);
-				TH2D * hCorX = dynamic_cast<TH2D*> (_rootObjectMap[ histoName ]);
+				TH2F * hCorX = dynamic_cast<TH2F*> (_rootObjectMap[ histoName ]);
 				hCorX->Fill(pos[0], anotherPos[0]);
 				
 				histoName = getHistoNameForDetector(_hCorY, detID, anotherDetID);
-				TH2D * hCorY = dynamic_cast<TH2D*> (_rootObjectMap[ histoName ]);
+				TH2F * hCorY = dynamic_cast<TH2F*> (_rootObjectMap[ histoName ]);
 				hCorY->Fill(pos[1], anotherPos[1]);
 				
 				histoName = getHistoNameForDetector(_hSyncX, detID, anotherDetID);
-				TH2D * hSyncX = dynamic_cast<TH2D*> (_rootObjectMap[ histoName ]);
+				TH2F * hSyncX = dynamic_cast<TH2F*> (_rootObjectMap[ histoName ]);
 				hSyncX->Fill(eventnum, pos[0]-anotherPos[0]);
 				
 				histoName = getHistoNameForDetector(_hSyncY, detID, anotherDetID);
-				TH2D * hSyncY = dynamic_cast<TH2D*> (_rootObjectMap[ histoName ]);
+				TH2F * hSyncY = dynamic_cast<TH2F*> (_rootObjectMap[ histoName ]);
 				hSyncY->Fill(eventnum, pos[1]-anotherPos[1]);
 				
 			}
