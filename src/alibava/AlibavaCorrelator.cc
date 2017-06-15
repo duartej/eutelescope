@@ -325,92 +325,81 @@ bool AlibavaCorrelator::isInDetectorIDsList(int detID)
     {
         return false;
     }
-    /*for (unsigned int i=0; i<_detectorIDs.size(); i++) 
-    {
-        if (detID == _detectorIDs[i]) return true;
-    }
-    return false;*/
 }
 
-void AlibavaCorrelator::processEvent (LCEvent * anEvent) {
-	
-	AlibavaEventImpl * alibavaEvent = static_cast<AlibavaEventImpl*> (anEvent);
-	int eventnum = alibavaEvent->getEventNumber();
-	
-	/////////////////////////////
-	// Now loop ever detectors //
-	
-	LCCollectionVec * collectionVec;
-	unsigned int noOfHits;
-	try{
-		collectionVec = dynamic_cast< LCCollectionVec * > ( alibavaEvent->getCollection( getInputCollectionName() ) ) ;
-} catch (DataNotAvailableException& e  ) 
-
+void AlibavaCorrelator::processEvent (LCEvent * anEvent)
+{
+    AlibavaEventImpl * alibavaEvent = static_cast<AlibavaEventImpl*> (anEvent);
+    const int eventnum = alibavaEvent->getEventNumber();
+    
+    LCCollectionVec * collectionVec = nullptr;
+    try
     {
-
-      streamlog_out  ( MESSAGE2 ) <<  "No input collection " << getInputCollectionName() << " found on event " << alibavaEvent->getEventNumber()
-
-                                  << " in run " << alibavaEvent->getRunNumber() << endl;
-
-      return ;
-
+        collectionVec = dynamic_cast< LCCollectionVec * > ( alibavaEvent->getCollection( getInputCollectionName() ) ) ;
+    } 
+    catch(DataNotAvailableException& e  ) 
+    {
+        streamlog_out(MESSAGE2) <<  "No input collection " 
+            << getInputCollectionName() << " found on event " 
+            << alibavaEvent->getEventNumber()
+            << " in run " << alibavaEvent->getRunNumber() << std::endl;
+        return;
     }
-	try{
-		CellIDDecoder<TrackerHitImpl> hitDecoder ( eutelescope::EUTELESCOPE::HITENCODING );
-		
-		noOfHits = collectionVec->getNumberOfElements();
-		
-		for ( size_t ihit = 0; ihit < noOfHits; ++ihit ){
-			TrackerHitImpl * ahit = dynamic_cast< TrackerHitImpl * > ( collectionVec->getElementAt( ihit ) ) ;
-			int detID = hitDecoder( ahit )["sensorID"];
-			if ( !isInDetectorIDsList(detID) ) continue;
-
-			const double* pos = ahit->getPosition();
-			
-			string histoName;
-			// fill hX
-			histoName = getHistoNameForDetector(_hHitPosX, detID);
-			TH1F * hX = dynamic_cast<TH1F*> (_rootObjectMap[ histoName ]);
-			hX->Fill(pos[0]);
-			// fill hY
-			histoName = getHistoNameForDetector(_hHitPosY, detID);
-			TH1F * hY = dynamic_cast<TH1F*> (_rootObjectMap[ histoName ]);
-			hY->Fill(pos[1]);
-			
-			// correlation plots
-			for (size_t i = 0; i < noOfHits; ++i ) {
-				TrackerHitImpl * anotherHit = dynamic_cast< TrackerHitImpl * > ( collectionVec->getElementAt( i ) ) ;
-				int anotherDetID = hitDecoder( anotherHit )["sensorID"];
-				// only consider hits from other detectors
-				if (detID >= anotherDetID) continue;
-				
-				const double* anotherPos = anotherHit->getPosition();
-				
-				histoName = getHistoNameForDetector(_hCorX, detID, anotherDetID);
-				TH2F * hCorX = dynamic_cast<TH2F*> (_rootObjectMap[ histoName ]);
-				hCorX->Fill(pos[0], anotherPos[0]);
-				
-				histoName = getHistoNameForDetector(_hCorY, detID, anotherDetID);
-				TH2F * hCorY = dynamic_cast<TH2F*> (_rootObjectMap[ histoName ]);
-				hCorY->Fill(pos[1], anotherPos[1]);
-				
-				histoName = getHistoNameForDetector(_hSyncX, detID, anotherDetID);
-				TH2F * hSyncX = dynamic_cast<TH2F*> (_rootObjectMap[ histoName ]);
-				hSyncX->Fill(eventnum, pos[0]-anotherPos[0]);
-				
-				histoName = getHistoNameForDetector(_hSyncY, detID, anotherDetID);
-				TH2F * hSyncY = dynamic_cast<TH2F*> (_rootObjectMap[ histoName ]);
-				hSyncY->Fill(eventnum, pos[1]-anotherPos[1]);
-				
-			}
-			
-		}
-		
-	} catch ( lcio::DataNotAvailableException ) {
-		// do nothing again
-		streamlog_out( ERROR5 ) << "Collection ("<<getInputCollectionName()<<") not found! " << endl;
-	}
-	
+    
+    /////////////////////////////
+    // Now loop ever detectors //
+    CellIDDecoder<TrackerHitImpl> hitDecoder ( eutelescope::EUTELESCOPE::HITENCODING );
+    const unsigned int noOfHits = collectionVec->getNumberOfElements();
+    
+    //for(const auto &  generic_hit: *collectionVec)
+    for(unsigned int ihit=0; ihit < noOfHits; ++ihit)
+    {
+        //TrackerHitImpl * ahit = dynamic_cast<TrackerHitImpl*>(generic_hit);
+        TrackerHitImpl * ahit = dynamic_cast<TrackerHitImpl*>(collectionVec->getElementAt(ihit));
+	const int detID = hitDecoder(ahit)["sensorID"];
+        if( !isInDetectorIDsList(detID) ) 
+        {
+            continue;
+        }
+        
+        const double* pos = ahit->getPosition();
+	// fill hX
+	std::string histoName = getHistoNameForDetector(_hHitPosX, detID);
+	TH1F * hX = dynamic_cast<TH1F*> (_rootObjectMap[ histoName ]);
+        hX->Fill(pos[0]);
+        // fill hY
+        histoName = getHistoNameForDetector(_hHitPosY, detID);
+        TH1F * hY = dynamic_cast<TH1F*> (_rootObjectMap[ histoName ]);
+        hY->Fill(pos[1]);
+        
+        // correlation plots
+	for(unsigned int i = ihit+1; i < noOfHits; ++i ) 
+        {
+            TrackerHitImpl * anotherHit = dynamic_cast< TrackerHitImpl * > ( collectionVec->getElementAt( i ) ) ;
+            int anotherDetID = hitDecoder( anotherHit )["sensorID"];
+            // only consider hits from other detectors
+            if(detID >= anotherDetID)
+            {
+                continue;
+            }
+            const double* anotherPos = anotherHit->getPosition();
+            histoName = getHistoNameForDetector(_hCorX, detID, anotherDetID);
+            TH2F * hCorX = dynamic_cast<TH2F*> (_rootObjectMap[ histoName ]);
+            hCorX->Fill(pos[0], anotherPos[0]);
+            
+            histoName = getHistoNameForDetector(_hCorY, detID, anotherDetID);
+            TH2F * hCorY = dynamic_cast<TH2F*> (_rootObjectMap[ histoName ]);
+            hCorY->Fill(pos[1], anotherPos[1]);
+            
+            histoName = getHistoNameForDetector(_hSyncX, detID, anotherDetID);
+            TH2F * hSyncX = dynamic_cast<TH2F*> (_rootObjectMap[ histoName ]);
+            hSyncX->Fill(eventnum, pos[0]-anotherPos[0]);
+            
+            histoName = getHistoNameForDetector(_hSyncY, detID, anotherDetID);
+            TH2F * hSyncY = dynamic_cast<TH2F*> (_rootObjectMap[ histoName ]);
+            hSyncY->Fill(eventnum, pos[1]-anotherPos[1]);
+        }
+    }
 }
 
 
