@@ -285,6 +285,7 @@ std::pair<EVENT::FloatVec,EVENT::FloatVec> AlibavaConstantCommonModeProcessor::c
             if( std::abs(it->second-mean_signal)/stddev_signal > _NoiseDeviation )
             {
                 non_signal_map.erase(it);
+                // [XXX: SHOULD I MASKED THIS CHANNEL?]
             }
             else
             {
@@ -356,7 +357,7 @@ float AlibavaConstantCommonModeProcessor::getStdDev(const EVENT::FloatVec & v,co
             [mean](const float & element) { return element-mean; } );
     // obtain the (x-E[x])^2 by using diff*diff (inner_product)
     const float sq_sum = std::inner_product(diff.begin(),diff.end(),diff.begin(),0.0);
-    return std::sqrt(sq_sum/diff.size());
+    return std::sqrt(sq_sum/static_cast<float>(diff.size()));
 }
 
 
