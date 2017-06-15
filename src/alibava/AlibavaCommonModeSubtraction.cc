@@ -251,7 +251,7 @@ void AlibavaCommonModeSubtraction::processEvent (LCEvent * anEvent)
     	// now subtract common mode values from all channels
         EVENT::FloatVec newdatavec(datavec.size());
         std::transform(datavec.begin(),datavec.end(),cmmdvec.begin(),newdatavec.begin(),
-                [](const float & dataPedSub,const float & cmmd) { return dataPedSub-cmmd; } );
+                [](const float & dataPed,const float & cmmd) { return dataPed-cmmd; } );
         // Just put to zero those masked channels (presumely that is already done
         // in every step, pedestal substraction, common mode, etc... but again)
     	for(size_t ichan=0; ichan<datavec.size();ichan++) 
