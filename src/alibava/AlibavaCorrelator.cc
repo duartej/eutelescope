@@ -3,6 +3,11 @@
  *  (2014 DESY)
  *
  *  email:eda.yildirim@cern.ch
+ *
+ *  Modified by J. Duarte-Campderros
+ *  (2017 IFCA-CERN) jorge.duarte.campderros@cern.ch
+ *    - Clean and coding style (Allman)
+ *    - Improve algorithms
  */
 
 
@@ -94,115 +99,122 @@ AlibavaCorrelator::AlibavaCorrelator () :
 }
 
 
-void AlibavaCorrelator::init () {
-	streamlog_out ( MESSAGE4 ) << "Running init" << endl;
+void AlibavaCorrelator::init () 
+{
+    streamlog_out ( MESSAGE4 ) << "Running init" << std::endl;
+    
+    /* To choose if processor should skip masked events
+     * ex. Set the value to 0 for false, to 1 for true
+     */
+    if(Global::parameters->isParameterSet(ALIBAVA::SKIPMASKEDEVENTS))
+    {
+        _skipMaskedEvents = bool ( Global::parameters->getIntVal(ALIBAVA::SKIPMASKEDEVENTS) );
+    }
+    else 
+    {
+        streamlog_out ( MESSAGE4 ) << "The Global Parameter "
+            << ALIBAVA::SKIPMASKEDEVENTS <<" is not set! Masked events will be used!" 
+            << std::endl;
+    }
 	
-	/* To choose if processor should skip masked events
-	 ex. Set the value to 0 for false, to 1 for true
-	 */
-	if (Global::parameters->isParameterSet(ALIBAVA::SKIPMASKEDEVENTS))
-		_skipMaskedEvents = bool ( Global::parameters->getIntVal(ALIBAVA::SKIPMASKEDEVENTS) );
-	else {
-		streamlog_out ( MESSAGE4 ) << "The Global Parameter "<< ALIBAVA::SKIPMASKEDEVENTS <<" is not set! Masked events will be used!" << endl;
-	}
+    // here sort _detectorIDs
+    std::sort(_detectorIDs.begin(),_detectorIDs.end());
 	
-	// here sort _detectorIDs
-	std::sort(_detectorIDs.begin(),_detectorIDs.end());
+    // this method is called only once even when the rewind is active
+    // usually a good idea to
+    printParameters ();
 	
-	// this method is called only once even when the rewind is active
-	// usually a good idea to
-	printParameters ();
-	
-	// if you want to change any variable defined in HistoXMLFile use this function
-	// see example function below
-	createRulesToChangeXMLValues();
+    // if you want to change any variable defined in HistoXMLFile use this function
+    // see example function below
+    createRulesToChangeXMLValues();
 }
 
-void AlibavaCorrelator::createRulesToChangeXMLValues(){
-	// here we define which variables in HistoXMLFile we want to change or modify
-	// You can only change or modify these variables:
-	// xBin, xMin, xMax, yBin, yMin, yMax, title, labelX and labelY
-	// others cannot be changed!
+void AlibavaCorrelator::createRulesToChangeXMLValues()
+{
+    // here we define which variables in HistoXMLFile we want to change or modify
+    // You can only change or modify these variables:
+    // xBin, xMin, xMax, yBin, yMin, yMax, title, labelX and labelY
+    // others cannot be changed!
 	
+    /*! If you want to replace one of these variables: xBin, xMin, xMax, yBin, yMin, yMax
+     * We will use the function
+     * void changeXMLVariable(string histoName, string variableName, float newValue);
+     *    defined in AlibavaBaseHistogramMaker
+     * Note that variableNames are case sensitive!
+     */
+    // For example usually it is good idea to replace maximum event number for example
+    // Lets say _someOtherHistoName histograms X axis should be total number of events
+    //	changeXMLVariable(_someOtherHistoName, "xMax", float(_totalNumberOfEvents));
+    // And _someOtherHistoName histograms Y axis should be 1000 since it is the max value it can get
+    //changeXMLVariable(_someHistoName, "yMax", 1000.0);
+    // It is really bad idea, but for some reason if you want
+    // to hard code the binning of X axis, here how you can do.
+    // Note that float number will be changed to integer in 
+    // AlibavaBaseHistogramMaker::updateXMLVariables() method but here 
+    // we should give it as float
+    // changeXMLVariable(_someOtherHistoName, "xBin", float(100));
 	
-	/*! If you want to replace one of these variables: xBin, xMin, xMax, yBin, yMin, yMax
-	 *  We will use the function
-	 *      		void changeXMLVariable(string histoName, string variableName, float newValue);
-	 *          defined in AlibavaBaseHistogramMaker
-	 *          Note that variableNames are case sensitive!
-	 */
+    /*! If you want to replace or modify one of these variables: title, labelX and labelY
+     *  We will use the function
+     *      		void addToXMLTitle(string histoName, string titleName, string whichSide, string stringToAdd);
+     *          defined in AlibavaBaseHistogramMaker
+     *          Note that titleName and whichSide are case sensitive!
+     */
 	
-	//  For example usually it is good idea to replace maximum event number for example
-	//  Lets say _someOtherHistoName histograms X axis should be total number of events
-	//	changeXMLVariable(_someOtherHistoName, "xMax", float(_totalNumberOfEvents));
-	// And _someOtherHistoName histograms Y axis should be 1000 since it is the max value it can get
-	//	changeXMLVariable(_someHistoName, "yMax", 1000.0);
-	// It is really bad idea, but for some reason if you want to hard code the binning of X axis, here how you can do. Note that float number will be changed to integer in AlibavaBaseHistogramMaker::updateXMLVariables() method but here we should give it as float
-	//	changeXMLVariable(_someOtherHistoName, "xBin", float(100));
-	
-	/*! If you want to replace or modify one of these variables: title, labelX and labelY
-	 *  We will use the function
-	 *      		void addToXMLTitle(string histoName, string titleName, string whichSide, string stringToAdd);
-	 *          defined in AlibavaBaseHistogramMaker
-	 *          Note that titleName and whichSide are case sensitive!
-	 */
-	
-	// Say that you have the signal in X axis of _someHistoName.
-	// Assuming that "Signal" is written in HistoXMLFile as this histograms labelY, to get "(_multiplySignalby) Signal" you should add signalMultipliedby string to the left
-	//		addToXMLTitle(_someHistoName, "labelY", "left", signalMultipliedby);
-	// Again it is usually bad idea but if you want to replace the X label here how you can do
-	//		addToXMLTitle(_someOtherHistoName, "labelX", "all", string("Event Number"));
-	// And here how you add string to right of title
-	//		addToXMLTitle(_someHistoName, "title", "right", string("Some thing"));
-	
-	
+    // Say that you have the signal in X axis of _someHistoName.
+    // Assuming that "Signal" is written in HistoXMLFile as this
+    // histograms labelY, to get "(_multiplySignalby) Signal" you
+    // should add signalMultipliedby string to the left
+    //		addToXMLTitle(_someHistoName, "labelY", "left", signalMultipliedby);
+    // Again it is usually bad idea but if you want to replace the X label here how you can do
+    //		addToXMLTitle(_someOtherHistoName, "labelX", "all", string("Event Number"));
+    // And here how you add string to right of title
+    //		addToXMLTitle(_someHistoName, "title", "right", string("Some thing"));
 }
 
 
-void AlibavaCorrelator::processRunHeader (LCRunHeader * rdr) {
-	streamlog_out ( MESSAGE4 ) << "Running processRunHeader" << endl;
+void AlibavaCorrelator::processRunHeader (LCRunHeader * rdr) 
+{
+    streamlog_out ( MESSAGE4 ) << "Running processRunHeader" << std::endl;
 	
-	// Add processor name to the runheader
-	auto arunHeader = std::make_unique<AlibavaRunHeaderImpl>(rdr);
-	arunHeader->addProcessor(type());
+    // Add processor name to the runheader
+    auto arunHeader = std::make_unique<AlibavaRunHeaderImpl>(rdr);
+    arunHeader->addProcessor(type());
 	
-	// set total number of events in this run
-	_totalNumberOfEvents = arunHeader->getNoOfEvents();
-	streamlog_out ( DEBUG1 ) << "N events "<<_totalNumberOfEvents << endl;
-	
-	// reads and creates the histograms defined in HistoXMLFile
-	bookHistos();
-	
-	// set number of skipped events to zero (defined in AlibavaBaseProcessor)
-	_numberOfSkippedEvents = 0;
-	
-	
-}
-std::string AlibavaCorrelator::getHistoNameForDetector(std::string name, int detID){
-	stringstream s;
-	s<< name <<"_d" << detID;
-	return s.str();
-	
-}
-std::string AlibavaCorrelator::getHistoNameForDetector(std::string name, int detID1, int detID2){
-	stringstream s;
-	s<< name <<"_d" << detID1 << "_d" << detID2;
-	return s.str();
-	
+    // set total number of events in this run
+    _totalNumberOfEvents = arunHeader->getNoOfEvents();
+    streamlog_out ( DEBUG1 ) << "N events "<<_totalNumberOfEvents << endl;
+
+    // reads and creates the histograms defined in HistoXMLFile
+    bookHistos();
+    
+    // set number of skipped events to zero (defined in AlibavaBaseProcessor)
+    _numberOfSkippedEvents = 0;
 }
 
-void AlibavaCorrelator::fillListOfHistos(){
-	addToHistoCheckList(_hHitPosX);
-	addToHistoCheckList(_hHitPosY);
-	addToHistoCheckList(_hCorX);
-	addToHistoCheckList(_hCorY);
-	addToHistoCheckList(_hSyncX);
-	addToHistoCheckList(_hSyncY);
-	
-	checkListOfHistosCreatedByXMLFile();
-	
+std::string AlibavaCorrelator::getHistoNameForDetector(std::string name, int detID)
+{
+    return std::string(name+"_d"+std::to_string(detID));
 }
 
+std::string AlibavaCorrelator::getHistoNameForDetector(std::string name, int detID1, int detID2)
+{
+    return std::string(name+"_d"+std::to_string(detID1)+"_d"+std::to_string(detID2));
+}
+
+void AlibavaCorrelator::fillListOfHistos()
+{
+    addToHistoCheckList(_hHitPosX);
+    addToHistoCheckList(_hHitPosY);
+    addToHistoCheckList(_hCorX);
+    addToHistoCheckList(_hCorY);
+    addToHistoCheckList(_hSyncX);
+    addToHistoCheckList(_hSyncY);
+    
+    checkListOfHistosCreatedByXMLFile();
+}
+
+// XXX Change to createTH1F
 void AlibavaCorrelator::createClones_hHitPos(string histoName)
 {
     AIDAProcessor::tree(this)->cd(this->name());
@@ -213,65 +225,73 @@ void AlibavaCorrelator::createClones_hHitPos(string histoName)
     AIDAProcessor::tree(this)->mkdir(histoName.c_str());
     AIDAProcessor::tree(this)->cd(histoName.c_str());
     
-    for (unsigned int idet=0; idet<_detectorIDs.size(); idet++) {
-		int detID = _detectorIDs[idet];
-		string newHistoName = getHistoNameForDetector(histoName, detID);
-		TH1F * hnew = (TH1F*)h->Clone( newHistoName.c_str() );
-		
-		string title = hnew->GetTitle();
-		title = title + string(" (det ") + to_string(detID) + string(")");
-		_rootObjectMap.insert(make_pair(newHistoName, hnew));
-	}
-	
+    for(unsigned int idet=0; idet<_detectorIDs.size(); idet++) 
+    {
+        int detID = _detectorIDs[idet];
+    	std::string newHistoName = getHistoNameForDetector(histoName, detID);
+	TH1F * hnew = (TH1F*)h->Clone( newHistoName.c_str() );
+
+        std::string title = hnew->GetTitle();
+	title = title + string(" (det ") + to_string(detID) + string(")");
+	_rootObjectMap.insert(std::make_pair(newHistoName, hnew));
+    }
 }
-void AlibavaCorrelator::createClones_hCor(string histoName){
-	AIDAProcessor::tree(this)->cd(this->name());
-	AIDAProcessor::tree(this)->cd(getInputCollectionName().c_str());
-	TH2F * h = dynamic_cast<TH2F*> (_rootObjectMap[histoName]);
+
+// XXX Change to createTH2F
+void AlibavaCorrelator::createClones_hCor(string histoName)
+{
+    AIDAProcessor::tree(this)->cd(this->name());
+    AIDAProcessor::tree(this)->cd(getInputCollectionName().c_str());
+    TH2F * h = dynamic_cast<TH2F*> (_rootObjectMap[histoName]);
+    
+    AIDAProcessor::tree(this)->mkdir(histoName.c_str());
+    AIDAProcessor::tree(this)->cd(histoName.c_str());
 	
-	AIDAProcessor::tree(this)->mkdir(histoName.c_str());
-	AIDAProcessor::tree(this)->cd(histoName.c_str());
-	
-	// the _detectorIDs vector has to be sorted
-	for (unsigned int idet=0; idet<_detectorIDs.size(); idet++) {
-		int detID = _detectorIDs[idet];
-		for (unsigned int iCorDet=idet+1; iCorDet<_detectorIDs.size(); iCorDet++) {
-			int corDetID = _detectorIDs[iCorDet]; // correlated detector id
-			
-			string newHistoName = getHistoNameForDetector(histoName, detID, corDetID);
-			TH2F * hnew = (TH2F*)h->Clone( newHistoName.c_str() );
-			string title = hnew->GetXaxis()->GetTitle();
-			title = title + string(" det") + to_string(detID);
-			
-			title = hnew->GetYaxis()->GetTitle();
-			title = title + string(" det") + to_string(corDetID);
-			
-			_rootObjectMap.insert(make_pair(newHistoName, hnew));
-		}
-	}
+    // the _detectorIDs vector has to be sorted
+    for (unsigned int idet=0; idet<_detectorIDs.size(); idet++) 
+    {
+        int detID = _detectorIDs[idet];
+        for (unsigned int iCorDet=idet+1; iCorDet<_detectorIDs.size(); iCorDet++) 
+        {
+            int corDetID = _detectorIDs[iCorDet]; // correlated detector id
+	    std::string newHistoName = getHistoNameForDetector(histoName, detID, corDetID);
+	    TH2F * hnew = (TH2F*)h->Clone( newHistoName.c_str() );
+	    std::string title = hnew->GetXaxis()->GetTitle();
+	    title = title + string(" det") + to_string(detID);
+            
+            title = hnew->GetYaxis()->GetTitle();
+            title = title + string(" det") + to_string(corDetID);
+            
+            _rootObjectMap.insert(make_pair(newHistoName, hnew));
+        }
+    }
 }
+
+// FIXME:: DUPLICATE 
 void AlibavaCorrelator::createClones_hSync(string histoName)
 {
     AIDAProcessor::tree(this)->cd(this->name());
-	AIDAProcessor::tree(this)->cd(getInputCollectionName().c_str());
-	TH2F * h = dynamic_cast<TH2F*> (_rootObjectMap[histoName]);
+    AIDAProcessor::tree(this)->cd(getInputCollectionName().c_str());
+    TH2F * h = dynamic_cast<TH2F*> (_rootObjectMap[histoName]);
 	
-	AIDAProcessor::tree(this)->mkdir(histoName.c_str());
-	AIDAProcessor::tree(this)->cd(histoName.c_str());
+    AIDAProcessor::tree(this)->mkdir(histoName.c_str());
+    AIDAProcessor::tree(this)->cd(histoName.c_str());
 	
-	// the _detectorIDs vector has to be sorted
-	for (unsigned int idet=0; idet<_detectorIDs.size(); idet++) {
-		int detID = _detectorIDs[idet];
-		for (unsigned int iCorDet=idet+1; iCorDet<_detectorIDs.size(); iCorDet++) {
-			int corDetID = _detectorIDs[iCorDet]; // correlated detector id
-			string newHistoName = getHistoNameForDetector(histoName, detID, corDetID);
-			TH2F * hnew = (TH2F*)h->Clone( newHistoName.c_str() );
-			string title = hnew->GetYaxis()->GetTitle();
-			title = title + string(" d") + to_string(detID) + string(" - d")+to_string(corDetID);
-			
-			_rootObjectMap.insert(make_pair(newHistoName, hnew));
-		}
-	}
+    // the _detectorIDs vector has to be sorted
+    for (unsigned int idet=0; idet<_detectorIDs.size(); idet++) 
+    {
+        int detID = _detectorIDs[idet];
+        for(unsigned int iCorDet=idet+1; iCorDet<_detectorIDs.size(); iCorDet++) 
+        {
+            int corDetID = _detectorIDs[iCorDet]; // correlated detector id
+            string newHistoName = getHistoNameForDetector(histoName, detID, corDetID);
+            TH2F * hnew = (TH2F*)h->Clone( newHistoName.c_str() );
+            string title = hnew->GetYaxis()->GetTitle();
+            title = title + string(" d") + to_string(detID) + string(" - d")+to_string(corDetID);
+            
+            _rootObjectMap.insert(make_pair(newHistoName, hnew));
+        }
+    }
 }
 
 void AlibavaCorrelator::bookHistos()
@@ -295,11 +315,21 @@ void AlibavaCorrelator::bookHistos()
     streamlog_out ( MESSAGE1 )  << "End of Booking histograms. " << std::endl;
 }
 
-bool AlibavaCorrelator::isInDetectorIDsList(int detID){
-	for (unsigned int i=0; i<_detectorIDs.size(); i++) {
-		if (detID == _detectorIDs[i]) return true;
-	}
-	return false;
+bool AlibavaCorrelator::isInDetectorIDsList(int detID)
+{
+    if(std::find(_detectorIDs.begin(),_detectorIDs.end(),detID) != std::end(_detectorIDs))
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+    /*for (unsigned int i=0; i<_detectorIDs.size(); i++) 
+    {
+        if (detID == _detectorIDs[i]) return true;
+    }
+    return false;*/
 }
 
 void AlibavaCorrelator::processEvent (LCEvent * anEvent) {

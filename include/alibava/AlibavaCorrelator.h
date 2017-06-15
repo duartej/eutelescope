@@ -3,6 +3,11 @@
  *  (2014 DESY)
  *
  *  email:eda.yildirim@cern.ch
+ *
+ *  Modified by J. Duarte-Campderros
+ *  (2017 IFCA-CERN) jorge.duarte.campderros@cern.ch
+ *    - Clean and coding style (Allman)
+ *    - Improve algorithms
  */
 
 #ifndef ALIBAVACORRELATOR_H
@@ -26,14 +31,12 @@
 #include <list>
 
 
-namespace alibava {
-	
-	class AlibavaCorrelator : public alibava::AlibavaBaseHistogramMaker   {
-		
-	public:
-		
-		
-		//! Returns a new instance of AlibavaCorrelator
+namespace alibava 
+{
+    class AlibavaCorrelator : public alibava::AlibavaBaseHistogramMaker   
+    {
+        public:
+            //! Returns a new instance of AlibavaCorrelator
 		/*! This method returns an new instance of the this processor.  It
 		 *  is called by Marlin execution framework and it shouldn't be
 		 *  called/used by the final user.
