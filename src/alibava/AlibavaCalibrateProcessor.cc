@@ -189,13 +189,13 @@ void AlibavaCalibrateProcessor::processRunHeader(LCRunHeader * rdr)
     // Print-out the info
     streamlog_out(MESSAGE) << "******************************************" << std::endl;
     streamlog_out(MESSAGE) << "Parameters for the calibration" << std::endl;
-    streamlog_out(MESSAGE) << "Initial charge (iC): " << _initialCharge << " [electrons]" << std::endl;
-    streamlog_out(MESSAGE) << "Final   charge (fC): " << _finalCharge   << " [electrons]" << std::endl;
-    streamlog_out(MESSAGE) << "Charge   steps (dC): " << _deltaCharge   << " [electrons]" << std::endl;
-    streamlog_out(MESSAGE) << "Number of pulses (nP): " << _nPulses << std::endl;
-    streamlog_out(MESSAGE) << "Number of Samples per step (nS): " << _nSamplesPerPulse << std::endl;
-    streamlog_out(MESSAGE) << "Total processed events (nP*nS): "  << _nSamplesPerPulse*_nPulses << std::endl;
-    streamlog_out(MESSAGE) << "*** Charge at event n: iC+dC*(nS+n)/nS ***" << std::endl;
+    streamlog_out(MESSAGE) << "Initial charge (IC): " << _initialCharge << " [electrons]" << std::endl;
+    streamlog_out(MESSAGE) << "Final   charge (FC): " << _finalCharge   << " [electrons]" << std::endl;
+    streamlog_out(MESSAGE) << "Charge   steps (DC): " << _deltaCharge   << " [electrons]" << std::endl;
+    streamlog_out(MESSAGE) << "Number of pulses (Np): " << _nPulses << std::endl;
+    streamlog_out(MESSAGE) << "Number of Samples per step (Ns): " << _nSamplesPerPulse << std::endl;
+    streamlog_out(MESSAGE) << "Total processed events (Np*Ns): "  << _nSamplesPerPulse*_nPulses << std::endl;
+    streamlog_out(MESSAGE) << "*** Charge at event n: IC+DC*(Ns+n)/Ns ***" << std::endl;
     streamlog_out(MESSAGE) << "******************************************" << std::endl;
     // Calibration info stored---
 
