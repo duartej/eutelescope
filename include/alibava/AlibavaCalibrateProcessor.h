@@ -114,7 +114,7 @@ namespace alibava
 	    //! Fill histograms
 	    /*! This method is used to fill in histograms for each channel. 
 	     */
-	    void fillHistos(TrackerDataImpl * trkdata, const int & evt);
+	    void fillHistos(TrackerDataImpl * trkdata, const int & injected_pulse, const int & evt);
 	    
 
 	    //! Called after data processing.

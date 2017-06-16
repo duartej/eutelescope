@@ -36,6 +36,7 @@
 // ROOT includes ".h"
 #include "TH1F.h"
 #include "TH2F.h"
+#include "TProfile.h"
 #include "TF1.h"
 #include "TCanvas.h"
 
@@ -248,7 +249,7 @@ void AlibavaCalibrateProcessor::processEvent(LCEvent * anEvent)
     {
         TrackerDataImpl * trkdata = dynamic_cast<TrackerDataImpl*>( collectionVec->getElementAt(i) ) ;
         // fill the raw ADCs histos
-        this->fillHistos(trkdata,anEvent->getEventNumber());
+        this->fillHistos(trkdata,alibavaEvent->getCalCharge(),anEvent->getEventNumber());
     }
 }
 
@@ -274,14 +275,6 @@ void AlibavaCalibrateProcessor::end()
     // for each chip 
     for(auto ichip: chipSelection) 
     {
-        // Get the pedestal and noise histos
-        TH2F * hcal = dynamic_cast<TH2F*> (_rootObjectMap[getCalChargeHistoName(ichip)]);
-        if(hcal == nullptr)
-        {
-            streamlog_out ( ERROR5 ) << "Calibration histogram '" 
-                << getCalChargeHistoName(ichip) << "' not booked." << std::endl;
-        }
-        
         // Get the Graph for that chip
         const std::string graphname(getCalChargeHistoName(ichip)+"_electrons");
         TH1F * grph = dynamic_cast<TH1F*>(_rootObjectMap[graphname]);
@@ -299,7 +292,7 @@ void AlibavaCalibrateProcessor::end()
                 // of the gaussian to fit
                 tempFitName = getChanDataFitName(ichip, ichan);
                 tempHistoName = getChanDataHistoName(ichip, ichan);
-                TH2F * histo = dynamic_cast<TH2F*>(_rootObjectMap[tempHistoName]);
+                TProfile * histo = dynamic_cast<TProfile*>(_rootObjectMap[tempHistoName]);
                 TF1 * tempfit = dynamic_cast<TF1*>(_rootObjectMap[tempFitName]);
                 // Fit to a line 
                 histo->Fit(tempfit,"Q");
@@ -345,11 +338,23 @@ std::string AlibavaCalibrateProcessor::getCalChargeHistoName(unsigned int ichip)
 }
 
 // Fill the raw ADCs histograms
-void AlibavaCalibrateProcessor::fillHistos(TrackerDataImpl * trkdata, const int & evt)
+void AlibavaCalibrateProcessor::fillHistos(TrackerDataImpl * trkdata, const int & injected_pulse, const int & evt)
 {
+    // NOTE the charge injection pattern follows:
+    //
+    //     EVENT   |   STRIP    | CHARGE SIGN
+    // ------------+------------+-------------
+    //  evt%2 == 0 |  i%2 == 0  |  NEGATIVE
+    //  evt%2 == 0 |  i%2 == 1  |  POSITIVE
+    //  ======================================
+    //  evt%2 == 1 |  i%2 == 0  |  POSITIVE
+    //  evt%2 == 1 |  i%2 == 1  |  NEGATIVE
+    //  
+    //  That conditions can be summarize with
+    //  (-1)**[ (EVENT%2) + ((STRIP+1)%2) ]
     // Get the injected charge (electrons) --> a function
     // Note that charge will depend on the parity of the event
-    const float injected_pulse = getInjectedCharge(evt);
+    //const float injected_pulse = getInjectedCharge(evt);
 
     // Get the raw ADCs
     const lcio::FloatVec datavec = trkdata->getChargeValues();
@@ -373,11 +378,12 @@ void AlibavaCalibrateProcessor::fillHistos(TrackerDataImpl * trkdata, const int 
         hCh->Fill(ichan,datavec[ichan]);
         
         // Pulse charge vs. ADC counts
-        if( TH2F * histo = dynamic_cast<TH2F*>(_rootObjectMap[getChanDataHistoName(chipnum,ichan)]) )
+        if( TProfile * histo = dynamic_cast<TProfile*>(_rootObjectMap[getChanDataHistoName(chipnum,ichan)]) )
         {
             // Note that the injected charge will depend on event parity
-            // and channel parity
-            const int sign = std::pow(-1,((evt+1)%2))*std::pow(-1,(ichan%2));
+            // and channel parity (see above)
+            //const int sign = std::pow(-1,0.((evt+1)%2))*std::pow(-1,(ichan%2));
+            const int sign = std::pow(-1,((evt%2)+(ichan+1)%2));
             histo->Fill(sign*injected_pulse*1e-3,datavec[ichan]);
         }
     }
@@ -440,8 +446,8 @@ void AlibavaCalibrateProcessor::bookHistos()
             const std::string tempHistoName = getChanDataHistoName(ichip,ichan);
             const std::string tempHistoTitle(tempHistoName+";Injected pulse [e x10^{3}] ;Signal [ADC]");
             
-            TH2F * chanDataHisto = new TH2F(tempHistoName.c_str(),"",2*_nPulses+1,
-                    (-1)*_finalCharge*1e-3,_finalCharge*1e-3,_nbins,_adcmin,_adcmax);
+            TProfile * chanDataHisto = new TProfile(tempHistoName.c_str(),"",2*_nPulses+1,
+                    (-1)*_finalCharge*1e-3,_finalCharge*1e-3,_adcmin,_adcmax);
             chanDataHisto->SetTitle(tempHistoTitle.c_str());
             _rootObjectMap.insert(std::make_pair(tempHistoName, chanDataHisto));
             
