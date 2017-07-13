@@ -168,12 +168,12 @@ namespace alibava
     
     	    // Eta histogram name for ClusterSize > 1
     	    std::string _etaHistoName;
-    	    
     	    // Cluster Size
     	    std::string _clusterSizeHistoName;
-    	    
-            // Cluster Size
+    	    // Cluster Size per event
     	    std::string _clusterSizePerEvtHistoName;
+            // 
+            std::string _clusterChargePerTDCTimeHistoName;
     };
     //! A global instance of the processor
     AlibavaSeedClustering gAlibavaSeedClustering;

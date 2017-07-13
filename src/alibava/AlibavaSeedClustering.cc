@@ -44,6 +44,7 @@
 
 // ROOT includes ".h"
 #include "TH1F.h"
+#include "TH2F.h"
 #include "TH1I.h"
 
 // system includes <>
@@ -68,7 +69,8 @@ AlibavaSeedClustering::AlibavaSeedClustering () :
     _signalPolarity(-1),
     _etaHistoName("hEta"),
     _clusterSizeHistoName("hClusterSize"),
-    _clusterSizePerEvtHistoName("hClusterPerEvent")
+    _clusterSizePerEvtHistoName("hClusterPerEvent"),
+    _clusterChargePerTDCTimeHistoName("hClusterChargePerTDCTime")
 {
     // modify processor description
     _description ="AlibavaSeedClustering finds clusters using seed "\
@@ -184,6 +186,7 @@ void AlibavaSeedClustering::processEvent (LCEvent * anEvent)
         _numberOfSkippedEvents++;
         return;
     }
+    const float tdctime = alibavaEvent->getEventTime();
     
     // As an input collection we get pedestal subtracted alibava data
     // This collection contains AlibavaEvents
@@ -214,10 +217,15 @@ void AlibavaSeedClustering::processEvent (LCEvent * anEvent)
         // The number of clusters per event histogram
         TH1I * h = dynamic_cast<TH1I*>(_rootObjectMap[getHistoNameForChip(_clusterSizePerEvtHistoName,i)]);
         h->Fill(clusters.size());
-    
+
+        // The cluster charge per tdc time
+        TH2F * hClusterSignalvsTime = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_clusterChargePerTDCTimeHistoName,i)]);
         // loop over clusters
         for(auto acluster: clusters) 
         {
+            // Fill charge vs. time histogram
+            hClusterSignalvsTime->Fill(tdctime,acluster.getSignalPolarity()*acluster.getTotalSignal());
+
             // create a TrackerDataImpl for each cluster
 	    TrackerDataImpl * alibavaCluster = new TrackerDataImpl();
             acluster.createTrackerData(alibavaCluster);
@@ -481,7 +489,7 @@ void AlibavaSeedClustering::fillHistos(AlibavaCluster anAlibavaCluster)
     
     int clusterSize = anAlibavaCluster.getClusterSize();
     TH1F * hClusterSize = dynamic_cast<TH1F*> (_rootObjectMap[getHistoNameForChip(_clusterSizeHistoName,ichip)]);
-    hClusterSize->Fill( clusterSize );	
+    hClusterSize->Fill( clusterSize );
 }
 
 void AlibavaSeedClustering::bookHistos()
@@ -508,10 +516,15 @@ void AlibavaSeedClustering::bookHistos()
 	title = std::string("Eta distribution ClusterSize > 1 (chip "+to_string(ichip)+string(");Eta;Number of Entries"));
         TH1F * hEta = new TH1F (histoName.c_str(),title.c_str(),100, -0.1, 1.1);
 	_rootObjectMap.insert(make_pair(histoName, hEta));
+        
+        // Cluster charge per TDC time 
+	histoName=getHistoNameForChip(_clusterChargePerTDCTimeHistoName,ichip);
+        title = "Charge cluster vs TDC time (chip "+to_string(ichip)+string(");TDC time [ns];Cluster Charge [ADC];");
+        TH2F * hClusterChargePerTDCtime = new TH2F(histoName.c_str(),title.c_str(),100, 0, 30,1000,0,1000);
+        _rootObjectMap.insert(make_pair(histoName, hClusterChargePerTDCtime));
 	
     } // end of loop over selected chips
-	
-	streamlog_out ( MESSAGE1 )  << "End of Booking histograms. " << endl;
+    streamlog_out ( MESSAGE1 )  << "End of Booking histograms. " << endl;
 }
 
 std::string AlibavaSeedClustering::getHistoNameForChip(string histoName, int ichip)
