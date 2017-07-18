@@ -44,9 +44,9 @@ FIND_PACKAGE( LCCD  REQUIRED )
 FIND_PACKAGE( GBL  REQUIRED )               
 
 # search for Eigen (linear algebra) library
-FIND_PACKAGE( Eigen2 REQUIRED)
+FIND_PACKAGE( Eigen3 REQUIRED)
 # include them as SYSTEM include directories, this will supress all warnings from them
-INCLUDE_DIRECTORIES( SYSTEM ${EIGEN2_INCLUDE_DIR} )
+INCLUDE_DIRECTORIES( SYSTEM ${EIGEN3_INCLUDE_DIR} )
 
 # development mode:
 
@@ -97,7 +97,6 @@ IF( ALLPIX_FOUND )
     ADD_DEFINITIONS( "-DUSE_ALLPIX " )
     GET_FILENAME_COMPONENT( ALLPIX_LIBRARY_FULL_PATH ${ALLPIX_ALLPIX_LIBRARY} REALPATH )
     INSTALL( FILES ${ALLPIX_LIBRARY_FULL_PATH} DESTINATION lib ) # PROGRAMS is like FILES but sets executable permissions
-
     # two ROOT libraries which are not always included in "root-config --glibs"
     find_library(
       LXMLPARSER
@@ -106,7 +105,6 @@ IF( ALLPIX_FOUND )
       PATH_SUFFIXES lib64 lib32 lib
       NO_DEFAULT_PATH
     )
-  
 
     find_library(
       LGEOM
@@ -121,12 +119,12 @@ IF( ALLPIX_FOUND )
  
     MESSAGE ( STATUS "linking TGeom : ${LGEOM}" )
     MESSAGE ( STATUS "linking TXMLParser : ${LXMLPARSER}" )
-
 ELSE()
     IF( DEFINED "$ENV{ALLPIX}" )
       MESSAGE( STATUS "WARNING: failed to configure Eutelescope with ALLPIX!!" )
     ENDIF()
 ENDIF()
+
 
 
 IF ( AIDA_FOUND)
@@ -185,6 +183,10 @@ FOREACH(impl_src ${IMPL_SRCS})
     GET_FILENAME_COMPONENT(basename ${impl_src} NAME_WE) 
     ADD_LIBRARY( ${basename} SHARED ${impl_src} )
 	INSTALL_SHARED_LIBRARY( ${basename} DESTINATION lib )
+    IF( ROOT_FOUND AND ROOT_GEOM_FOUND )
+        TARGET_LINK_LIBRARIES( ${basename} ${ROOT_GEOM_LIBRARY} )
+    ENDIF()
+    TARGET_LINK_LIBRARIES( ${basename} ${libname} )
 ENDFOREACH()  
 
 # Properly add the CMSPixelDecoder external dependency:
