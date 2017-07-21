@@ -43,8 +43,9 @@ find_path(
     NAMES xercesc/util/XercesVersion.hpp
 )
 
+# DEPRECATE--> Give a lot of syntax problems in the makefile
 EXECUTE_PROCESS(
-    COMMAND find ${XercesC_HOME}/include/xercesc/ -type d # -printf "%p;" # not recognized on mac osx
+    COMMAND find ${XercesC_HOME}/include/xercesc/ -type d  -printf "%p;" # not recognized on mac osx
     OUTPUT_VARIABLE XERCESC_INCLUDE_DIR
     RESULT_VARIABLE _exit_code
 )

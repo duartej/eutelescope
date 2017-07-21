@@ -14,13 +14,11 @@
 
   SET ( G4_DIR "$ENV{G4INSTALL}" )
 
-  EXECUTE_PROCESS(
-      COMMAND test -d ${G4_DIR}/include/Geant4/
-      OUTPUT_VARIABLE G4_INCLUDE_DIRS
-      RESULT_VARIABLE _exit_code
-  )
+  IF(IS_DIRECTORY ${G4_DIR}/include/Geant4)
+      SET(G4_INCLUDE_DIRS "${G4_DIR}/include/Geant4")
+  ENDIF()
 
-  FILE( GLOB G4_LIBRARIES "${G4_DIR}/lib/libG4*.so" )
+  FILE( GLOB G4_LIBRARIES "${G4_DIR}/lib64/libG4*.so" )
 
 
 # ---------- final checking ---------------------------------------------------
