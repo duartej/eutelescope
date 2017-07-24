@@ -65,11 +65,15 @@ AlibavaClusterHistogramMaker::AlibavaClusterHistogramMaker():
     AlibavaBaseHistogramMaker("AlibavaClusterHistogramMaker"),
     // List of Histogram names, initialized here.
     _clusterSizeVsHitAmplitudeHistoName("hClusterSizeVsHitAmplitude"),
+    _timeVsHitAmplitudeHistoName("hTimeVsHitAmplitude"),
+    _timeVsSNRHistoName("hTimeVsSNR"),
+    _timeVsSeedHistoName("hTimeVsSeed"),
     _etaVSCoG("hEta_vs_CoG"),
     _etaVSUCPFA("hEta_vs_UCPFA"),
     _etaVSClusterSize("hEta_vs_ClusterSize"),
     _clusterSizeVsCoG("hClusterSize_vs_CoG"),
-    _clusterSizeVsUCPFA("hClusterSize_vs_UCPFA")
+    _clusterSizeVsUCPFA("hClusterSize_vs_UCPFA"),
+    _timeVsClusters("hTimeVsClusters")
 {
     // modify processor description
     _description ="AlibavaClusterHistogramMaker takes some "\
@@ -189,6 +193,7 @@ void AlibavaClusterHistogramMaker::createRulesToChangeXMLValues()
         // For this first create the string you want add
         std::string signalMultipliedby(" ("+std::to_string(_multiplySignalby)+") ");
         addToXMLTitle(_clusterSizeVsHitAmplitudeHistoName, "labelY", "left", signalMultipliedby);
+        addToXMLTitle(_timeVsHitAmplitudeHistoName, "labelY", "left", signalMultipliedby);
     }	
 }
 
@@ -240,12 +245,16 @@ void AlibavaClusterHistogramMaker::fillListOfHistos()
     //////////////////////
     // One per each chip
     addToHistoCheckList_PerChip(_clusterSizeVsHitAmplitudeHistoName);
+    addToHistoCheckList_PerChip(_timeVsHitAmplitudeHistoName);
+    addToHistoCheckList_PerChip(_timeVsSNRHistoName);
+    addToHistoCheckList_PerChip(_timeVsSeedHistoName);
     addToHistoCheckList_PerChip(_etaVSCoG);
     addToHistoCheckList_PerChip(_etaVSUCPFA);
     addToHistoCheckList_PerChip(_etaVSClusterSize);
     addToHistoCheckList_PerChip(_clusterSizeVsCoG);
     addToHistoCheckList_PerChip(_clusterSizeVsUCPFA);
     addToHistoCheckList_PerChip(_calChargeHistoName);
+    addToHistoCheckList_PerChip(_timeVsClusters);
     
     //////////////////////
     // One for all chips
@@ -324,10 +333,18 @@ void AlibavaClusterHistogramMaker::processEvent (LCEvent * anEvent)
         streamlog_out( ERROR5 ) << "Collection ("<<getInputCollectionName()<<") not found! " << std::endl;
         return;
     }
-    
+
+    // For event-like quantities histograms
+    std::map<int,int> clusterSize;
+    for(auto ichip: getChipSelection())
+    {
+        clusterSize[ichip] = 0;
+    }
+
     for(const auto & ptkdata : *collectionVec)
     {
         TrackerDataImpl * trkdata = dynamic_cast<TrackerDataImpl*>(ptkdata);
+        AlibavaCluster anAlibavaCluster(trkdata);
     	
         // if this event selected to be plotted fill the histogram
         if(plotThisEvent)
@@ -336,13 +353,24 @@ void AlibavaClusterHistogramMaker::processEvent (LCEvent * anEvent)
             // how it will fill is defined in fillEventHisto
     	    fillEventHisto(eventnum,trkdata);
         }
+        // Event-like quantities
 
     	// for everything else
-    	fillHistos(trkdata);
+    	fillHistos(&anAlibavaCluster,alibavaEvent->getEventTime());
     	if(printClusters)
         {
             printAlibavaCluster(trkdata);
         }
+        // What chip?
+        int ichip = anAlibavaCluster.getChipNum();
+    
+        ++clusterSize[ichip];
+    }
+    // Histograms event-like quantities
+    for(auto ichip: getChipSelection())
+    {
+        TH2F * histo = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_timeVsClusters,ichip)]);
+        histo->Fill(alibavaEvent->getEventTime(), clusterSize[ichip]);
     }
 }
 
@@ -352,41 +380,53 @@ void AlibavaClusterHistogramMaker::printAlibavaCluster(TrackerDataImpl* trkdata)
     anAlibavaCluster.print();
 }
 
-void AlibavaClusterHistogramMaker::fillHistos(TrackerDataImpl * trkdata )
+void AlibavaClusterHistogramMaker::fillHistos(AlibavaCluster * anAlibavaCluster, float const & time )
 {
     // We will first convert his trkdata to AlibavaCluster
     // see AlibavaCluster::AlibavaCluster(TrackerDataImpl * trkdata)
 	
-    AlibavaCluster anAlibavaCluster(trkdata);
-    int ichip = anAlibavaCluster.getChipNum();
+    //AlibavaCluster anAlibavaCluster(trkdata);
+    int ichip = anAlibavaCluster->getChipNum();
     
     
     // Lets fill Cluster size histogram
-    int clusterSize = anAlibavaCluster.getClusterSize();
+    int clusterSize = anAlibavaCluster->getClusterSize();
     
     // And the hit amplitude depending on the cluster size (the last two could be just absorved 
     // by this one)
     TH2F *histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_clusterSizeVsHitAmplitudeHistoName,ichip)]);
-    histo2->Fill( clusterSize,_multiplySignalby * anAlibavaCluster.getTotalSignal());
+    histo2->Fill( clusterSize,_multiplySignalby * anAlibavaCluster->getTotalSignal());
+
+    // Hit amplitude depending on the TDC time
+    histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_timeVsHitAmplitudeHistoName,ichip)]);
+    histo2->Fill( time,_multiplySignalby * anAlibavaCluster->getTotalSignal());
+    
+    // Cluster signal to noise depending on the TDC time
+    histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_timeVsSNRHistoName,ichip)]);
+    histo2->Fill( time,anAlibavaCluster->getTotalSNR(getNoiseOfChip(ichip)));
+    
+    // Cluster Seed channel depending on the TDC time
+    histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_timeVsSeedHistoName,ichip)]);
+    histo2->Fill( time,anAlibavaCluster->getSeedChanNum() );
 
     // if calibration was defined
     if( _chargeCalMap.size() > 0)
     {
-        TH1F * hprov = dynamic_cast<TH1F*>(_rootObjectMap[getHistoNameForChip(_calChargeHistoName,ichip)]);
-        hprov->Fill(_multiplySignalby*anAlibavaCluster.getTotalSignal(_chargeCalMap[ichip])*1e-3);
+        histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_calChargeHistoName,ichip)]);
+        histo2->Fill(time,_multiplySignalby*anAlibavaCluster->getTotalSignal(_chargeCalMap[ichip])*1e-3);
     }
     
     
     // Then fill eta histograms
-    const float eta = anAlibavaCluster.getEta();
+    const float eta = anAlibavaCluster->getEta();
     
     // center of gravity
-    const float CoG = anAlibavaCluster.getCenterOfGravity();
+    const float CoG = anAlibavaCluster->getCenterOfGravity();
     histo2 = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_etaVSCoG,ichip)]);
     histo2->Fill(CoG, eta);
     
     // Using the Unbiased center position
-    const float UCPFA = anAlibavaCluster.getUnbiasedCenterPosition();
+    const float UCPFA = anAlibavaCluster->getUnbiasedCenterPosition();
     histo2 = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_etaVSUCPFA,ichip)]);
     histo2->Fill(UCPFA, eta);
     

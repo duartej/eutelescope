@@ -25,8 +25,10 @@
 #include <string>
 #include <list>
 
-
 namespace alibava {
+
+    // forward declaration
+    class AlibavaCluster;
 	
 	class AlibavaClusterHistogramMaker : public alibava::AlibavaBaseHistogramMaker   {
 		
@@ -113,7 +115,7 @@ namespace alibava {
 		/*! This method is used to fill in histograms for each event.
 		 *
 		 */
-		virtual void fillHistos(TrackerDataImpl * trkdata);
+		virtual void fillHistos(AlibavaCluster * trkdata, const float & eventTime);
 		
 
 		//! Called after data processing.
@@ -156,7 +158,14 @@ namespace alibava {
 		
                 // Cluster size vs. Hit Amplitude
                 std::string _clusterSizeVsHitAmplitudeHistoName;
-		
+                // Event Time vs. Hit Amplitude
+                std::string _timeVsHitAmplitudeHistoName;
+                // Event Time vs. cluster SNR 
+                std::string _timeVsSNRHistoName;
+
+                // Event Time vs. cluster seed 
+                std::string _timeVsSeedHistoName;
+
 		// Eta vs Center of gravity
 		std::string _etaVSCoG;
 		
@@ -171,6 +180,9 @@ namespace alibava {
                 
                 // Cluster size vs. Unbiased Position cluster Finding Algorithm
                 std::string _clusterSizeVsUCPFA;
+                
+                // Event time vs. Number of clusters per event
+                std::string _timeVsClusters;
 	};
 	
 	//! A global instance of the processor
