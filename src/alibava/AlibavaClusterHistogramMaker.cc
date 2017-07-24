@@ -68,6 +68,7 @@ AlibavaClusterHistogramMaker::AlibavaClusterHistogramMaker():
     _timeVsHitAmplitudeHistoName("hTimeVsHitAmplitude"),
     _timeVsSNRHistoName("hTimeVsSNR"),
     _timeVsSeedHistoName("hTimeVsSeed"),
+    _signalVsSeedHistoName("hSignalVsSeed"),
     _etaVSCoG("hEta_vs_CoG"),
     _etaVSUCPFA("hEta_vs_UCPFA"),
     _etaVSClusterSize("hEta_vs_ClusterSize"),
@@ -248,6 +249,7 @@ void AlibavaClusterHistogramMaker::fillListOfHistos()
     addToHistoCheckList_PerChip(_timeVsHitAmplitudeHistoName);
     addToHistoCheckList_PerChip(_timeVsSNRHistoName);
     addToHistoCheckList_PerChip(_timeVsSeedHistoName);
+    addToHistoCheckList_PerChip(_signalVsSeedHistoName);
     addToHistoCheckList_PerChip(_etaVSCoG);
     addToHistoCheckList_PerChip(_etaVSUCPFA);
     addToHistoCheckList_PerChip(_etaVSClusterSize);
@@ -406,8 +408,12 @@ void AlibavaClusterHistogramMaker::fillHistos(AlibavaCluster * anAlibavaCluster,
     histo2->Fill( time,anAlibavaCluster->getTotalSNR(getNoiseOfChip(ichip)));
     
     // Cluster Seed channel depending on the TDC time
+    const int seedChanNumber = anAlibavaCluster->getSeedChanNum();
     histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_timeVsSeedHistoName,ichip)]);
-    histo2->Fill( time,anAlibavaCluster->getSeedChanNum() );
+    histo2->Fill( time,seedChanNumber );
+    // Cluster seed channel vs. the signal in the channel
+    histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_signalVsSeedHistoName,ichip)]);
+    histo2->Fill( _multiplySignalby*anAlibavaCluster->getTotalSignal(),seedChanNumber );
 
     // if calibration was defined
     if( _chargeCalMap.size() > 0)

@@ -165,6 +165,9 @@ namespace alibava {
 
                 // Event Time vs. cluster seed 
                 std::string _timeVsSeedHistoName;
+                
+                // Signal of the seed vs. cluster seed channel
+                std::string _signalVsSeedHistoName;
 
 		// Eta vs Center of gravity
 		std::string _etaVSCoG;
