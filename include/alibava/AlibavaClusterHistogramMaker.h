@@ -163,6 +163,11 @@ namespace alibava {
                 // Event Time vs. cluster SNR 
                 std::string _timeVsSNRHistoName;
 
+                // SNR over some useful quantities
+                std::string _SNRVsHitAmplitudeHistoName;
+                std::string _etaVsSNRHistoName;
+                std::string _etaFromClusterVsSNRHistoName;
+
                 // Event Time vs. cluster seed 
                 std::string _timeVsSeedHistoName;
                 
@@ -175,8 +180,11 @@ namespace alibava {
                 // Eta vs Unbiased Position Cluster Finding Algorithm
 		std::string _etaVSUCPFA;
 
-		// Eta vs Cluster size
+		// Eta (seed) vs Cluster size
 		std::string _etaVSClusterSize;
+		
+                // Eta (cluster) vs Cluster size
+		std::string _etaFromClusterVSClusterSize;
 		
                 // Cluster size vs. Center of Gravity
                 std::string _clusterSizeVsCoG;

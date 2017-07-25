@@ -67,7 +67,7 @@ namespace alibava
                 
                 // The eta is calculated using only the strips
                 // belonging to the cluster
-                //float getEtaFromCluster();
+                float getEtaFromCluster();
 
 		// setter / getter for _eta
 		float getEta();

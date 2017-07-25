@@ -67,11 +67,15 @@ AlibavaClusterHistogramMaker::AlibavaClusterHistogramMaker():
     _clusterSizeVsHitAmplitudeHistoName("hClusterSizeVsHitAmplitude"),
     _timeVsHitAmplitudeHistoName("hTimeVsHitAmplitude"),
     _timeVsSNRHistoName("hTimeVsSNR"),
+    _SNRVsHitAmplitudeHistoName("hSNRVsHitAmplitude"),
+    _etaVsSNRHistoName("hEtaVsSNR"),
+    _etaFromClusterVsSNRHistoName("hEtaFromClusterVsSNR"),
     _timeVsSeedHistoName("hTimeVsSeed"),
     _signalVsSeedHistoName("hSignalVsSeed"),
     _etaVSCoG("hEta_vs_CoG"),
     _etaVSUCPFA("hEta_vs_UCPFA"),
     _etaVSClusterSize("hEta_vs_ClusterSize"),
+    _etaFromClusterVSClusterSize("hEtaFromCluster_vs_ClusterSize"),
     _clusterSizeVsCoG("hClusterSize_vs_CoG"),
     _clusterSizeVsUCPFA("hClusterSize_vs_UCPFA"),
     _timeVsClusters("hTimeVsClusters")
@@ -248,11 +252,15 @@ void AlibavaClusterHistogramMaker::fillListOfHistos()
     addToHistoCheckList_PerChip(_clusterSizeVsHitAmplitudeHistoName);
     addToHistoCheckList_PerChip(_timeVsHitAmplitudeHistoName);
     addToHistoCheckList_PerChip(_timeVsSNRHistoName);
+    addToHistoCheckList_PerChip(_SNRVsHitAmplitudeHistoName);
+    addToHistoCheckList_PerChip(_etaVsSNRHistoName);
+    addToHistoCheckList_PerChip(_etaFromClusterVsSNRHistoName);
     addToHistoCheckList_PerChip(_timeVsSeedHistoName);
     addToHistoCheckList_PerChip(_signalVsSeedHistoName);
     addToHistoCheckList_PerChip(_etaVSCoG);
     addToHistoCheckList_PerChip(_etaVSUCPFA);
     addToHistoCheckList_PerChip(_etaVSClusterSize);
+    addToHistoCheckList_PerChip(_etaFromClusterVSClusterSize);
     addToHistoCheckList_PerChip(_clusterSizeVsCoG);
     addToHistoCheckList_PerChip(_clusterSizeVsUCPFA);
     addToHistoCheckList_PerChip(_calChargeHistoName);
@@ -404,8 +412,13 @@ void AlibavaClusterHistogramMaker::fillHistos(AlibavaCluster * anAlibavaCluster,
     histo2->Fill( time,_multiplySignalby * anAlibavaCluster->getTotalSignal());
     
     // Cluster signal to noise depending on the TDC time
+    const float SNR_cluster = anAlibavaCluster->getTotalSNR(getNoiseOfChip(ichip));
     histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_timeVsSNRHistoName,ichip)]);
-    histo2->Fill( time,anAlibavaCluster->getTotalSNR(getNoiseOfChip(ichip)));
+    histo2->Fill( time,SNR_cluster);
+    
+    // The SNR and the signal
+    histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_SNRVsHitAmplitudeHistoName,ichip)]);
+    histo2->Fill( SNR_cluster, _multiplySignalby*anAlibavaCluster->getTotalSignal() );
     
     // Cluster Seed channel depending on the TDC time
     const int seedChanNumber = anAlibavaCluster->getSeedChanNum();
@@ -424,7 +437,16 @@ void AlibavaClusterHistogramMaker::fillHistos(AlibavaCluster * anAlibavaCluster,
     
     
     // Then fill eta histograms
-    const float eta = anAlibavaCluster->getEta();
+    const float eta            = anAlibavaCluster->getEta();
+    const float etaFromCluster = anAlibavaCluster->getEtaFromCluster();
+    
+    // the Eta (seed) vs. SNR
+    histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_etaVsSNRHistoName,ichip)]);
+    histo2->Fill( eta,SNR_cluster );
+    
+    // the Eta (cluster) vs. SNR
+    histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_etaFromClusterVsSNRHistoName,ichip)]);
+    histo2->Fill( etaFromCluster, SNR_cluster );
     
     // center of gravity
     const float CoG = anAlibavaCluster->getCenterOfGravity();
@@ -442,6 +464,9 @@ void AlibavaClusterHistogramMaker::fillHistos(AlibavaCluster * anAlibavaCluster,
     // cluster size
     histo2 = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_etaVSClusterSize,ichip)]);
     histo2->Fill(clusterSize, eta);
+    
+    histo2 = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_etaFromClusterVSClusterSize,ichip)]);
+    histo2->Fill(clusterSize, etaFromCluster);
     
     histo2 = dynamic_cast<TH2F*> (_rootObjectMap[getHistoNameForChip(_clusterSizeVsCoG,ichip)]);
     histo2->Fill(CoG,clusterSize);
