@@ -36,6 +36,7 @@
 #include <UTIL/CellIDEncoder.h>
 
 // system includes
+#include <ctime>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -152,11 +153,11 @@ void AlibavaConverter::readDataSource(int /* numEvents */)
     // Read Header //
     /////////////////
     // --- Time of start of the run 
-    unsigned int date;
+    unsigned int date = 0;
     infile.read(reinterpret_cast< char *> (&date), sizeof(unsigned int));
     // --- Run type: 1:Calibration; 2:Laser Syn.; 3:Laser; 4: Rad. source; 5: Pedestal
-    int type;
-    infile.read(reinterpret_cast< char *> (&type), sizeof(int));
+    int _type;
+    infile.read(reinterpret_cast< char *> (&_type), sizeof(int));
     // --- Header lenght
     unsigned int lheader; 
     infile.read(reinterpret_cast< char *> (&lheader), sizeof(unsigned int));
@@ -214,8 +215,8 @@ void AlibavaConverter::readDataSource(int /* numEvents */)
     runHeader->setDetectorName(Global::GEAR->getDetectorName());
     runHeader->setHeader(header);
     runHeader->setHeaderVersion(version);
-    runHeader->setDataType(type);
-    runHeader->setDateTime(string(ctime(reinterpret_cast<time_t*>(&date))));
+    runHeader->setDataType(_type);
+    runHeader->setDateTime(std::string(ctime(reinterpret_cast<time_t*>(&date))));
     if(_storeHeaderPedestalNoise) 
     {
         runHeader->setHeaderPedestal(headerPedestal);
@@ -229,7 +230,7 @@ void AlibavaConverter::readDataSource(int /* numEvents */)
     std::string tmpstring = getSubStringUpToChar(header,";",0);
     int noofevents = atoi(tmpstring.c_str());
     runHeader->setNoOfEvents(noofevents);
-    //runHeader->addProcessor(type());
+    //runHeader->addProcessor(_type());
 	
     ProcessorMgr::instance()->processRunHeader( runHeader->lcRunHeader() ) ;
     
