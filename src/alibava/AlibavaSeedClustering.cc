@@ -263,8 +263,9 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
     const FloatVec noiseVec = this->getNoiseOfChip(chipnum);
     
     // then check which channels we can add to a cluster
-    // obviously not the ones masked
-    std::vector<bool> channel_can_be_used;//(dataVec.size());
+    // obviously not the ones masked. 
+    // Note that all channels are set to true initially
+    std::vector<bool> channel_can_be_used(dataVec.size(),true);
     // And mask channels that cannot pass NeighbourSNRCut, 
     // add the *channel numbers* as seed candidate if it pass SeedSNRCut
     std::vector<int> seedCandidates;
@@ -277,7 +278,7 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
             continue;
         }
         // if it is here, it is not masked, so ..
-        channel_can_be_used.push_back(true);
+        //channel_can_be_used.push_back(true);
 	// calculate snr = signal/noise
         const float snr = (_signalPolarity * dataVec[ichan])/noiseVec[ichan];
 	// mask channels that cannot pass NeighbourSNRCut
