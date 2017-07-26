@@ -39,8 +39,11 @@
 // system includes <>
 #include <string>
 #include <iostream>
+#include <iomanip>
 #include <stdlib.h>
 #include <algorithm>
+#include <numeric>
+#include <map>
 
 
 using namespace std;
@@ -102,8 +105,6 @@ void AlibavaBaseProcessor::setOutputCollectionName(std::string outputCollectionN
 std::string AlibavaBaseProcessor::getOutputCollectionName(){
 	return _outputCollectionName;
 }
-
-
 
 
 ///////////////////////////
@@ -558,34 +559,38 @@ bool AlibavaBaseProcessor::isMaskingValid(int onchip, int fromchannel, int tocha
 }
 
 
-void AlibavaBaseProcessor::printChannelMasking(){
-	int channelprintnum = 16;
-	
-	streamlog_out( MESSAGE5 ) <<" ChannelsToBeUsed set as: ";
-	for (unsigned int istr=0; istr<_channelsToBeUsed.size(); istr++)
-		streamlog_out( MESSAGE5 ) <<_channelsToBeUsed[istr]<<", ";
-	streamlog_out( MESSAGE5 )<< endl;
-	
-	streamlog_out( MESSAGE5 ) <<"****************************"<<endl;
-	streamlog_out( MESSAGE5 ) <<"* Applied Channel Masking: *"<<endl;
-	
-	for (unsigned int i=0; i<_chipSelection.size(); i++) {
-		int ichip = _chipSelection[i];
-		streamlog_out( MESSAGE5 ) <<"*** Chip "<<ichip<<" ***";
-		for (int ichan=0; ichan<ALIBAVA::NOOFCHANNELS; ) {
-			if (ichan % channelprintnum ==0){
-				streamlog_out( MESSAGE5 ) <<endl;
-				streamlog_out( MESSAGE5 ) <<" Channels "<<ichan<<" - "<<ichan+channelprintnum-1<<" : ";
-			}
-			streamlog_out( MESSAGE5 ) << isMasked(ichip, ichan)<< " ";
-			ichan++;
-			
-		}
-		streamlog_out( MESSAGE5 )<< endl;
-	}
-	streamlog_out( MESSAGE5 ) <<"****************************"<<endl;
-	
-	
+void AlibavaBaseProcessor::printChannelMasking()
+{
+    int channelprintnum = 16;
+    
+    streamlog_out( MESSAGE5 ) <<" ChannelsToBeUsed set as: ";
+    for(unsigned int istr=0; istr<_channelsToBeUsed.size(); ++istr)
+    {
+        streamlog_out( MESSAGE5 ) <<_channelsToBeUsed[istr]<<", ";
+    }
+    streamlog_out( MESSAGE5 )<< endl;
+    
+    streamlog_out( MESSAGE5 ) <<"******************************************************"<<endl;
+    streamlog_out( MESSAGE5 ) <<"************** Applied Channel Masking: **************"<<endl;
+    
+    for(auto ichip: _chipSelection) 
+    {
+        streamlog_out( MESSAGE5 ) <<"***************** Chip "<< ichip <<" ****************";
+        for(int ichan=0; ichan<ALIBAVA::NOOFCHANNELS; ) 
+        {
+            if(ichan % channelprintnum ==0)
+            {
+                streamlog_out( MESSAGE5 ) <<endl;
+                streamlog_out( MESSAGE5 ) <<" Channels "<< std::setw(3) 
+                    << ichan<<" - "<< std::setw(3) << ichan+channelprintnum-1 
+                    << " : ";
+            }
+            streamlog_out( MESSAGE5 ) << !(isMasked(ichip, ichan)) << " ";
+            ++ichan;
+        }
+        streamlog_out( MESSAGE5 )<< endl;
+    }
+    streamlog_out( MESSAGE5 ) <<"******************************************************"<<endl;
 }
 
 //returns the min chip number
@@ -619,6 +624,50 @@ int AlibavaBaseProcessor::getChipNum(TrackerDataImpl * trkdata){
 }
 
 
+// Helper functions to calculate mean and std-deviation
+EVENT::FloatVec AlibavaBaseProcessor::convertIntoVec(const std::map<int,float> & m)
+{
+    EVENT::FloatVec v;
+    for(const auto & _f: m)
+    {
+        v.push_back(_f.second);
+    }
+    return v;
+}
 
+float AlibavaBaseProcessor::getMean(const std::map<int,float> & m)
+{
+    return this->getMean(this->convertIntoVec(m));
+}
+
+float AlibavaBaseProcessor::getMean(const EVENT::FloatVec & v)
+{
+    if(v.size() == 0)
+    {
+        return 0.0;
+    }
+    return std::accumulate(v.begin(),v.end(),0.0)/float(v.size());
+}
+
+float AlibavaBaseProcessor::getStdDev(const std::map<int,float> & m,const float & mean)
+{
+    return this->getStdDev(this->convertIntoVec(m),mean);
+}
+
+float AlibavaBaseProcessor::getStdDev(const EVENT::FloatVec & v,const float & mean)
+{
+    if(v.size()==0)
+    {
+        return 0.0;
+    }
+    // standard deviation = sqrt( E[(x-E[x])^2] )
+    std::vector<float> diff(v.size());
+    // Get x-E[x] in `diff`
+    std::transform(v.begin(),v.end(),diff.begin(),
+            [mean](const float & element) { return element-mean; } );
+    // obtain the (x-E[x])^2 by using diff*diff (inner_product)
+    const float sq_sum = std::inner_product(diff.begin(),diff.end(),diff.begin(),0.0);
+    return std::sqrt(sq_sum/static_cast<float>(diff.size()));
+}
 
 

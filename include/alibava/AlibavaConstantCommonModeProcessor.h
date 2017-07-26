@@ -182,17 +182,6 @@ namespace alibava
             /*! Returns the common mode vec and the associated error
              */
             std::pair<EVENT::FloatVec,EVENT::FloatVec> calculateConstantCommonMode(const EVENT::FloatVec & adcs,const int & chip_num);
-
-            //! Auxiliary function to convert a int,float map
-            //  into a vector of floats (ignoring the index)
-            EVENT::FloatVec convertIntoVec(const std::map<int,float> & m);
-            //! Auxiliary function to calculate means and standard 
-            //  deviation
-            float getMean(const EVENT::FloatVec & v);
-            float getMean(const std::map<int,float> & m);
-            float getStdDev(const EVENT::FloatVec & v, const float & mean);
-            float getStdDev(const std::map<int,float> & m, const float & mean);
-	    
 	    
 	    //! vector to store intermediate/final common mode value
 	    EVENT::FloatVec _commonmode;

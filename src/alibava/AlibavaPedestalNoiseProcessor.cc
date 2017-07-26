@@ -144,8 +144,7 @@ void AlibavaPedestalNoiseProcessor::processRunHeader(LCRunHeader * rdr)
     
     // An instance of the input output manager (Pedestal and noise)
     AlibavaPedNoiCalIOManager man;
-    // Prepare the lcio file with the pedestal and noise, using the
-    // run Header of the input lcio (i.e. the uncorrected pedestal lcio file?)
+    // Prepare the lcio file with the pedestal and noise, 
     man.createFile(_pedestalFile, arunHeader->lcRunHeader());
     // and book the needed histograms
     bookHistos();

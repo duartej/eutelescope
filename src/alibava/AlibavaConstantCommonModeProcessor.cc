@@ -246,8 +246,8 @@ void AlibavaConstantCommonModeProcessor::end()
 // The workhorse of this class
 std::pair<EVENT::FloatVec,EVENT::FloatVec> AlibavaConstantCommonModeProcessor::calculateConstantCommonMode(const EVENT::FloatVec & datavec, const int & chipnum)
 {
-    streamlog_out( DEBUG0 ) << "Calculate Constant common mode:" << std::endl;
-    streamlog_out( DEBUG0 ) << " ++ Chip " << chipnum << " of " << getNumberOfChips() << ", now iterating...";
+    streamlog_out( DEBUG ) << "Calculate Constant common mode:" << std::endl;
+    streamlog_out( DEBUG ) << " ++ Chip " << chipnum << " of " << getNumberOfChips() << ", now iterating...";
 
     // Just a cross-check
     if(datavec.size() == 0)
@@ -255,36 +255,46 @@ std::pair<EVENT::FloatVec,EVENT::FloatVec> AlibavaConstantCommonModeProcessor::c
         streamlog_out(ERROR) << " Number of not masked and valid ADCs" 
             << " (pedestal substracted) channels is ZERO." << std::endl;
     }
-
-    // 1. Obtain the mean and the standard deviation for the signal ADCs 
-    //    (pedestal substracted) (i.e. the common noise)
-    float mean_signal  = this->getMean(datavec);
-    float stddev_signal= this->getStdDev(datavec,mean_signal);
-
-    // 2. Use the mean and standard deviation to exclude real
-    //    signal presence. Criteria, anything above 2.5 sigmas from the mean
-    //    is considered signal
     // Map to keep only non-signal ADCs 
     // ichannel: ADC
     std::map<int,float> non_signal_map;
     // initialize the map
     for(int i=0; i < static_cast<int>(datavec.size()); ++i)
     {
+        // Non including in the calculation the 
+        // masked channels if any
+        if(this->isMasked(chipnum,i))
+        {
+            continue;
+        }
         non_signal_map.emplace(i,datavec[i]);
     }
-    unsigned int last_vec_size = datavec.size();
-    while( non_signal_map.size() != last_vec_size )
+
+    // 1. Obtain the mean and the standard deviation for the signal ADCs 
+    //    (pedestal substracted) (i.e. the common noise)
+    float mean_signal  = this->getMean(non_signal_map);
+    float stddev_signal= this->getStdDev(non_signal_map,mean_signal);
+
+    // 2. Use the mean and standard deviation to exclude real
+    //    signal presence. Criteria, anything above 2.5 sigmas from the mean
+    //    is considered signal
+    unsigned int last_vec_size = non_signal_map.size();
+    do
     {
+        // after the check from the 'while' statement, update
+        // the last know vector size
+        last_vec_size = non_signal_map.size();
         for(auto it = non_signal_map.cbegin(); it != non_signal_map.cend(); /* no increment*/)
         {
             if(isMasked(chipnum,it->first))
             {
+                ++it;
                 continue;
             }
             // Remove the signal channels 
             if( std::abs(it->second-mean_signal)/stddev_signal > _NoiseDeviation )
             {
-                non_signal_map.erase(it);
+                non_signal_map.erase(it++);
                 // [XXX: SHOULD I MASKED THIS CHANNEL?]
             }
             else
@@ -296,9 +306,7 @@ std::pair<EVENT::FloatVec,EVENT::FloatVec> AlibavaConstantCommonModeProcessor::c
         // 3. Recalculate the mean with the excluded signal channels
         mean_signal  = this->getMean(non_signal_map);
         stddev_signal= this->getStdDev(non_signal_map,mean_signal);
-        // and the new vector size
-        last_vec_size = non_signal_map.size();
-    }
+    } while( non_signal_map.size() != last_vec_size );
 
     EVENT::FloatVec commonmodeVec(ALIBAVA::NOOFCHANNELS);
     EVENT::FloatVec commonmodeerrorVec(ALIBAVA::NOOFCHANNELS);
@@ -313,51 +321,6 @@ std::pair<EVENT::FloatVec,EVENT::FloatVec> AlibavaConstantCommonModeProcessor::c
         << stddev_signal << std::endl;
 
     return std::make_pair(commonmodeVec,commonmodeerrorVec);
-}
-
-EVENT::FloatVec AlibavaConstantCommonModeProcessor::convertIntoVec(const std::map<int,float> & m)
-{
-    EVENT::FloatVec v;
-    for(const auto & _f: m)
-    {
-        v.push_back(_f.second);
-    }
-    return v;
-}
-
-float AlibavaConstantCommonModeProcessor::getMean(const std::map<int,float> & m)
-{
-    return this->getMean(this->convertIntoVec(m));
-}
-
-float AlibavaConstantCommonModeProcessor::getMean(const EVENT::FloatVec & v)
-{
-    if(v.size() == 0)
-    {
-        return 0.0;
-    }
-    return std::accumulate(v.begin(),v.end(),0.0)/float(v.size());
-}
-
-float AlibavaConstantCommonModeProcessor::getStdDev(const std::map<int,float> & m,const float & mean)
-{
-    return this->getStdDev(this->convertIntoVec(m),mean);
-}
-
-float AlibavaConstantCommonModeProcessor::getStdDev(const EVENT::FloatVec & v,const float & mean)
-{
-    if(v.size()==0)
-    {
-        return 0.0;
-    }
-    // standard deviation = sqrt( E[(x-E[x])^2] )
-    std::vector<float> diff(v.size());
-    // Get x-E[x] in `diff`
-    std::transform(v.begin(),v.end(),diff.begin(),
-            [mean](const float & element) { return element-mean; } );
-    // obtain the (x-E[x])^2 by using diff*diff (inner_product)
-    const float sq_sum = std::inner_product(diff.begin(),diff.end(),diff.begin(),0.0);
-    return std::sqrt(sq_sum/static_cast<float>(diff.size()));
 }
 
 

@@ -110,6 +110,11 @@ namespace alibava {
 		// to access the noise value of a channel
 		float getNoiseAtChannel(int chipnum, int channum);
 
+                //! Mask automaticaly noisy channels. Channels are
+                // considered noisy if their noise is more than the 
+                // 'std_dev_criteria' (see implementation for details)
+                void maskNoisyChannels(const int & chipnum, const float & std_deviation_criteria = 3.0);
+
 		///////////////////////////
 		// Charge Calibration
 		///////////////////////////
@@ -170,7 +175,17 @@ namespace alibava {
 		bool isChipValid(int ichip);
 		// returns true if the channel number is valid
 		bool isChannelValid(int ichan);
-		
+
+                //! Auxiliary function to convert a int,float map
+                //  into a vector of floats (ignoring the index)
+                EVENT::FloatVec convertIntoVec(const std::map<int,float> & m);
+                //! Auxiliary function to calculate means and standard 
+                //  deviation
+                float getMean(const EVENT::FloatVec & v);
+                float getMean(const std::map<int,float> & m);
+                float getStdDev(const EVENT::FloatVec & v, const float & mean);
+                float getStdDev(const std::map<int,float> & m, const float & mean);
+
 		// !!!
 		// All the parameters that will be registered should be a public member!!!
 		// !!!
