@@ -140,6 +140,10 @@ namespace alibava {
 		///////////////////////////
 		// Others
 		///////////////////////////
+                
+                // Print out the pedestal, noise or calibration vectors
+                void printOutPedNoiCalCollection(const std::map<int,EVENT::FloatVec> & thecollection);
+
 		// getter and setter for _nChips
 		void setChipSelection(EVENT::IntVec chipselection);
 		EVENT::IntVec getChipSelection();

@@ -210,6 +210,7 @@ void AlibavaBaseProcessor::checkPedestals()
     if(_isPedestalValid)
     {
         streamlog_out(MESSAGE5)<< "The pedestal values for all selected chips are valid!"<<std::endl;
+        this->printOutPedNoiCalCollection(this->_pedestalMap);
     }
     else
     {
@@ -219,6 +220,7 @@ void AlibavaBaseProcessor::checkPedestals()
     if(_isNoiseValid)
     {
         streamlog_out(MESSAGE5)<< "The noise values for all selected chips are valid!"<<std::endl;
+        this->printOutPedNoiCalCollection(this->_noiseMap);
     }
     else
     {
@@ -403,60 +405,65 @@ void AlibavaBaseProcessor::setCalibration()
     checkCalibration();
 }
 
-void AlibavaBaseProcessor::checkCalibration(){
+void AlibavaBaseProcessor::checkCalibration()
+{
+    _isCalibrationValid = true;
+    
+    // for each selected chip get and save pedestal and noise values
+    for(auto chipnum: getChipSelection())
+    {
+        if( static_cast<int>(_chargeCalMap[chipnum].size()) != ALIBAVA::NOOFCHANNELS )
+        {
+            streamlog_out(ERROR5)<< "The charge calibration values for chip "
+                << chipnum <<" is not set properly!"<<std::endl;
+            _isCalibrationValid = false;
+        }
+    }
 	
-	_isCalibrationValid = true;
-	
-	// first get selected chips
-	EVENT::IntVec selectedchips = getChipSelection();
-	if(selectedchips.size()==0){
-		streamlog_out(ERROR5)<< "No selected chips found! Couldn't set calibration values!"<<endl;
-		_isCalibrationValid = false;
-	}
-	EVENT::FloatVec vec_float;
-	
-	// for each selected chip get and save pedestal and noise values
-	for (unsigned int ichip=0; ichip<selectedchips.size(); ichip++) {
-		int chipnum = selectedchips[ichip];
-		
-		// check pedestal values for this chip
-		vec_float.clear();
-		vec_float = _chargeCalMap[chipnum];
-		if( int(vec_float.size()) != ALIBAVA::NOOFCHANNELS){
-			streamlog_out(ERROR5)<< "The charge calibration values for chip "<<chipnum<<" is not set properly!"<<endl;
-			_isCalibrationValid = false;
-		}
-	}
-	
-	if(_isCalibrationValid)
-		streamlog_out(MESSAGE5)<< "The calibration values for all selected chips are valid!"<<endl;
+    if(_isCalibrationValid)
+    {
+        streamlog_out(MESSAGE5)<< "The calibration values for all selected chips are valid!"<<std::endl;
+        this->printOutPedNoiCalCollection(this->_chargeCalMap);
+    }
+    else
+    {
+        streamlog_out(ERROR5)<< "No selected chips found! Couldn't set calibration values!"<<std::endl;
+        _isCalibrationValid = false;
+    }
 	
 }
 
 
 // getter and setter for _chargeCalCollectionName
-void AlibavaBaseProcessor::setChargeCalCollectionName(std::string chargeCalCollectionName){
-	_chargeCalCollectionName = chargeCalCollectionName;
-}
-std::string AlibavaBaseProcessor::getChargeCalCollectionName(){
-	return _chargeCalCollectionName;
-}
-// to access the charge calibration values of a chip
-EVENT::FloatVec AlibavaBaseProcessor::getChargeCalOfChip(int chipnum){
-	return _chargeCalMap[chipnum];
-}
-// to access the charge calibration value of a channel
-float AlibavaBaseProcessor::getChargeCalAtChannel(int chipnum, int channum){
-	if (_isCalibrationValid){
-		EVENT::FloatVec vec_float = getChargeCalOfChip(chipnum);
-		return vec_float[channum];
-	}
-	else {
-		streamlog_out(ERROR5)<< "The noise values for chip "<<chipnum<<" is not set properly!"<<endl;
-		return 0;
-	}
+void AlibavaBaseProcessor::setChargeCalCollectionName(std::string chargeCalCollectionName)
+{
+    _chargeCalCollectionName = chargeCalCollectionName;
 }
 
+std::string AlibavaBaseProcessor::getChargeCalCollectionName()
+{
+    return _chargeCalCollectionName;
+}
+
+// to access the charge calibration values of a chip
+EVENT::FloatVec AlibavaBaseProcessor::getChargeCalOfChip(int chipnum)
+{
+    return _chargeCalMap[chipnum];
+}
+
+// to access the charge calibration value of a channel
+float AlibavaBaseProcessor::getChargeCalAtChannel(int chipnum, int channum)
+{
+    if(_isCalibrationValid)
+    {
+        return getChargeCalOfChip(chipnum)[channum];
+    }
+    else 
+    {
+        streamlog_out(ERROR5)<< "The noise values for chip "<<chipnum<<" is not set properly!"<<endl;
+        return 0;
+    }
+}
 
 
 ///////////////////////////
@@ -485,6 +492,51 @@ float AlibavaBaseProcessor::getChargeCalAtChannel(int chipnum, int channum){
 //        << ALIBAVA::CHANNELSTOBEUSED <<" is not set!" << std::endl;
 //    return false;
 //}
+//
+
+// Print-out function for noise, pedestals or calibration
+void AlibavaBaseProcessor::printOutPedNoiCalCollection(const std::map<int,EVENT::FloatVec> & themap)
+{
+    int channelprintnum = 8;
+    
+    std::string wcol("");
+    if(themap == this->_pedestalMap)
+    {
+        wcol = "Pedestals";
+    }
+    else if(themap == this->_noiseMap)
+    {
+        wcol = "Noise";
+    }
+    else if(themap == this->_chargeCalMap)
+    {
+        wcol = "Calibration";
+    }
+    
+    streamlog_out( MESSAGE5 ) <<"******************************************************"<<endl;
+    streamlog_out( MESSAGE5 ) <<"****** Current values for the " 
+        << std::setw(12) << wcol << " map: ******"<<endl;
+    
+    std::cout.precision(3);
+    for(auto ichip: _chipSelection) 
+    {
+        streamlog_out( MESSAGE5 ) <<"***************** Chip "<< ichip <<" ****************";
+        for(int ichan=0; ichan<ALIBAVA::NOOFCHANNELS; ) 
+        {
+            if(ichan % channelprintnum ==0)
+            {
+                streamlog_out( MESSAGE5 ) <<endl;
+                streamlog_out( MESSAGE5 ) <<" Channels "<< std::setw(3) 
+                    << ichan<<" - "<< std::setw(3) << ichan+channelprintnum-1 
+                    << " : ";
+            }
+            streamlog_out( MESSAGE5 ) << std::setw(8) << themap.at(ichip)[ichan] << " ";
+            ++ichan;
+        }
+        streamlog_out( MESSAGE5 )<< endl;
+    }
+    streamlog_out( MESSAGE5 ) <<"******************************************************"<<endl;
+}
 	
 
 // getter and setter for _chipSelection
