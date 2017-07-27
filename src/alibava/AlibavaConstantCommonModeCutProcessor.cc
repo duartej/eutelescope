@@ -229,7 +229,7 @@ void AlibavaConstantCommonModeCutProcessor::processEvent (LCEvent * anEvent)
             break;
         }
 	// contain it in cmmdValues
-        cmmdValues.push_back(cmmdValue_forThisChip);
+        cmmdValues[i] = cmmdValue_forThisChip;
     } // end of loop ever chips
 		
     // now loop over cmmdValues and count how many of those not in the range
@@ -246,12 +246,13 @@ void AlibavaConstantCommonModeCutProcessor::processEvent (LCEvent * anEvent)
     if(  (_maskIfAnyChipsCommonModeIsNotInRange && Nchipsfailed > 0 ) ||
             ( (!_maskIfAnyChipsCommonModeIsNotInRange) && Nchipsfailed == noOfChips ) )
     {
+        this->fillHistos(alibavaEvent);
         alibavaEvent->maskEvent();
         ++_numberOfMaskedEvents;
         ++_totalNumberOfMaskedEvents;
 
 	streamlog_out(DEBUG1)<< "Event masked with common mode values: ";
-        for (unsigned int i=0; i<cmmdValues.size(); ++i) 
+        for(unsigned int i=0; i<cmmdValues.size(); ++i) 
         {
             streamlog_out(DEBUG1)<< cmmdValues[i] << ", ";
         }
