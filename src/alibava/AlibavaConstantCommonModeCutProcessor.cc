@@ -131,6 +131,7 @@ void AlibavaConstantCommonModeCutProcessor::processRunHeader (LCRunHeader * rdr)
     
     // get and set selected chips
     setChipSelection(arunHeader->getChipSelection());
+    
     // set channels to be used (if it is defined)
     setChannelsToBeUsed();
 		

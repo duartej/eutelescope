@@ -242,8 +242,15 @@ namespace alibava {
 		 *   Note that the numbers should be in ascending order
 		 *   and there should be no space between two $ character
 		 */
-
 		EVENT::StringVec _channelsToBeUsed;
+
+                //! Whether or not the noisy channel auto masking is activated
+                /*! A channel will be masked if |noise_ch - <noise>| > C sigma 
+                 *  being C = _autoMaskingCriteria  (default: 2.5)
+                 */
+                bool _isAutoMaskingActive;
+                float _autoMaskingCriterium;
+                
 	
 		////////////////////////////
 		// Skipping Masked Events //

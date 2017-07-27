@@ -91,37 +91,61 @@ AlibavaBaseProcessor("ExampleAlibavaProcessor")
 }
 
 
-void ExampleAlibavaProcessor::init () {
-	streamlog_out ( MESSAGE4 ) << "Running init" << endl;
+void ExampleAlibavaProcessor::init () 
+{
+    streamlog_out ( MESSAGE4 ) << "Running init" << endl;
 
-	// this method is called only once even when the rewind is active
-	// usually a good idea to
-	printParameters ();
+    // this method is called only once even when the rewind is active
+    // usually a good idea to
+    printParameters ();
 
-	/* To set of channels to be used
-	 ex.The format should be like $ChipNumber:StartChannel-EndChannel$
-	 ex. $0:5-20$ $0:30-100$ $1:50-70$
-	 means from chip 0 channels between 5-20 and 30-100, from chip 1 channels between 50-70 will be used (all numbers included). the rest will be masked and not used
-	 Note that the numbers should be in ascending order and there should be no space between two $ character
-	 */
-	if (Global::parameters->isParameterSet(ALIBAVA::CHANNELSTOBEUSED))
-		Global::parameters->getStringVals(ALIBAVA::CHANNELSTOBEUSED,_channelsToBeUsed);
-	else {
-		streamlog_out ( MESSAGE4 ) << "The Global Parameter "<< ALIBAVA::CHANNELSTOBEUSED <<" is not set!" << endl;
-	}
+    /* To set of channels to be used
+     ex.The format should be like $ChipNumber:StartChannel-EndChannel$
+     ex. $0:5-20$ $0:30-100$ $1:50-70$
+     means from chip 0 channels between 5-20 and 30-100, 
+     from chip 1 channels between 50-70 will be used (all 
+     numbers included). the rest will be masked and not used
+     Note that the numbers should be in ascending order and 
+     there should be no space between two $ character
+     */
+    if (Global::parameters->isParameterSet(ALIBAVA::CHANNELSTOBEUSED))
+    {
+        Global::parameters->getStringVals(ALIBAVA::CHANNELSTOBEUSED,_channelsToBeUsed);
+    }
+    else 
+    {
+        streamlog_out ( MESSAGE4 ) << "The Global Parameter "
+            << ALIBAVA::CHANNELSTOBEUSED <<" is not set!" << endl;
+    }
 	
+    /* To choose if processor should skip masked events
+     ex. Set the value to 0 for false, to 1 for true
+     */
+    if (Global::parameters->isParameterSet(ALIBAVA::SKIPMASKEDEVENTS))
+    {
+        _skipMaskedEvents = bool ( Global::parameters->getIntVal(ALIBAVA::SKIPMASKEDEVENTS) );
+    }
+    else
+    {
+        streamlog_out ( MESSAGE4 ) << "The Global Parameter "
+            << ALIBAVA::SKIPMASKEDEVENTS <<" is not set! Masked events will be used!" << endl;
+    }
+    // Whether to activate or not the noisy channel auto masking
+    streamlog_out(MESSAGE4) << "Noisy channel auto-masking is ";
+    if(Global::parameters->isParameterSet(ALIBAVA::AUTOMASKINGACTIVE))
+    {
+        _isAutoMaskingActive = Global::parameters->getIntVal(ALIBAVA::AUTOMASKINGACTIVE);
+    }
+    streamlog_out(MESSAGE4) << _isAutoMaskingActive;
 
-	/* To choose if processor should skip masked events
-	 ex. Set the value to 0 for false, to 1 for true
-	 */
-	if (Global::parameters->isParameterSet(ALIBAVA::SKIPMASKEDEVENTS))
-		_skipMaskedEvents = bool ( Global::parameters->getIntVal(ALIBAVA::SKIPMASKEDEVENTS) );
-	else {
-		streamlog_out ( MESSAGE4 ) << "The Global Parameter "<< ALIBAVA::SKIPMASKEDEVENTS <<" is not set! Masked events will be used!" << endl;
-	}
-
-	
+    if(Global::parameters->isParameterSet(ALIBAVA::AUTOMASKINGCRITERIA))
+    {
+        _autoMaskingCriterium = Global::parameters->getFloatVal(ALIBAVA::AUTOMASKINGCRITERIA);
+    }
+    streamlog_out(MESSAGE4) << " ( if ON, using " << _autoMaskingCriterium 
+        << " sigmas )" << std::endl;
 }
+
 void ExampleAlibavaProcessor::processRunHeader (LCRunHeader * rdr) {
 	streamlog_out ( MESSAGE4 ) << "Running processRunHeader" << endl;
 
@@ -132,11 +156,12 @@ void ExampleAlibavaProcessor::processRunHeader (LCRunHeader * rdr) {
 	// get and set selected chips
 	setChipSelection(arunHeader->getChipSelection());
 	
-	// set channels to be used (if it is defined)
-	setChannelsToBeUsed();
-	
 	// set pedestal and noise values
 	setPedestals();
+	
+	// set channels to be used (if it is defined)
+        // after setPedestal in case the automasking is enabled
+	setChannelsToBeUsed();
 	
 	// if you want
 	bookHistos();

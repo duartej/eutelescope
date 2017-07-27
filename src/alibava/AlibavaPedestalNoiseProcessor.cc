@@ -139,7 +139,8 @@ void AlibavaPedestalNoiseProcessor::processRunHeader(LCRunHeader * rdr)
     auto arunHeader = std::make_unique<AlibavaRunHeaderImpl>(rdr);
     arunHeader->addProcessor(type());
     setChipSelection( arunHeader->getChipSelection() );
-    // Masking channels (user input).  XXX:  Maybe decide a criteria to do it automaticaly?
+    
+    // Masking channels (user input)
     setChannelsToBeUsed();
     
     // An instance of the input output manager (Pedestal and noise)

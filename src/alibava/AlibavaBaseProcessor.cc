@@ -63,6 +63,8 @@ AlibavaBaseProcessor::AlibavaBaseProcessor (std::string processorName) :
     _noiseCollectionName(ALIBAVA::NOTSET),
     _chargeCalCollectionName(ALIBAVA::NOTSET),
     _channelsToBeUsed(),
+    _isAutoMaskingActive(false),
+    _autoMaskingCriterium(2.5),
     _skipMaskedEvents(false),
     _numberOfSkippedEvents(0),
     _chipSelection(),
@@ -295,6 +297,84 @@ bool AlibavaBaseProcessor::isNoiseValid(){
 	return _isNoiseValid;
 }
 
+// [JDC] Find noisy channels
+void AlibavaBaseProcessor::maskNoisyChannels(const int & chip,const float & criteria)
+{
+    streamlog_out(MESSAGE5) << "Automaticaly masking noisy channel, defined as "
+        << "|Noise_i - <Noise>| > " << criteria << " sigma" << std::endl;
+    if(not this->isNoiseValid())
+    {
+        streamlog_out(ERROR5) << " The noise values for chip " << chip 
+            << " is not set properly" << std::endl;
+    }
+    const EVENT::FloatVec noise_vec = this->getNoiseOfChip(chip);
+    // -- Map to keep only non-noisy channels
+    // ichannel: noise
+    std::map<int,float> non_noisy_map;
+    // initialize the map
+    for(int i=0; i < static_cast<int>(noise_vec.size()); ++i)
+    {
+        // Not taking into account the masked channels
+        if(this->isMasked(chip,i))
+        {
+            continue;
+        }
+        non_noisy_map.emplace(i,noise_vec[i]);
+    }
+    
+    // 1. Obtain the mean and the standard deviation for the noise
+    float mean_noise = this->getMean(non_noisy_map);
+    float stddev_noise= this->getStdDev(non_noisy_map,mean_noise);
+    
+    // 2. Use the mean and standard deviation to find noisy channels, 
+    //    while using criteria defined by the user
+    
+    // Remove iteratively noisy channels until converge (the
+    // map will not loose any member anymore)
+    unsigned int last_vec_size = noise_vec.size();
+    do
+    {
+        // after the check from the 'while' statement, update
+        // the last know vector size
+        last_vec_size = non_noisy_map.size();
+        for(auto it = non_noisy_map.cbegin(); it != non_noisy_map.cend(); /* no increment*/)
+        {
+            if(this->isMasked(chip,it->first))
+            {
+                ++it;
+                continue;
+            }
+            // Remove the noisy channels and tag it as masked channel
+            if( std::abs(it->second-mean_noise)/stddev_noise > criteria )
+            {
+                streamlog_out(MESSAGE5) << "[AUTO-MASKED] noisy channel: " << it->first 
+                    << " with noise: " << it->second << " (Mean noise all channels: " 
+                    << mean_noise << ", standard deviation: " << stddev_noise << ")" << std::endl;
+                this->_isMasked[chip][it->first] = true;
+                non_noisy_map.erase(it++);
+            }
+            else
+            {
+                // or keep it
+                ++it;
+            }
+        }
+        // 3. Recalculate the mean with the excluded signal channels
+        mean_noise  = this->getMean(non_noisy_map);
+        stddev_noise= this->getStdDev(non_noisy_map,mean_noise);
+    } while( non_noisy_map.size() != last_vec_size );
+    
+    // The new vector
+    EVENT::FloatVec noise_vec_new(ALIBAVA::NOOFCHANNELS,0);
+    for(auto ich_noise: non_noisy_map)
+    {
+        noise_vec_new[ich_noise.first] = ich_noise.second;
+    }
+
+    // and update the noise map with the masked channels (zero value)
+    _noiseMap[chip] = noise_vec_new;
+}
+
 ///////////////////////////
 // Charge Calibration
 ///////////////////////////
@@ -491,6 +571,14 @@ void AlibavaBaseProcessor::setChannelsToBeUsed()
             }
     		
     	}
+    }
+    // And now the automatic masking if requested
+    if(_isAutoMaskingActive)
+    {
+        for(auto ichip: this->getChipSelection())
+        {
+            this->maskNoisyChannels(ichip,_autoMaskingCriterium);
+        }
     }
     printChannelMasking();
 }

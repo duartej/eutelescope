@@ -143,6 +143,20 @@ void AlibavaSeedClustering::init ()
         streamlog_out ( MESSAGE4 ) << "The Global Parameter "
             << ALIBAVA::SKIPMASKEDEVENTS <<" is not set! Masked events will be used!" << std::endl;
     }
+    // Whether to activate or not the noisy channel auto masking
+    streamlog_out(MESSAGE4) << "Noisy channel auto-masking is ";
+    if(Global::parameters->isParameterSet(ALIBAVA::AUTOMASKINGACTIVE))
+    {
+        _isAutoMaskingActive = Global::parameters->getIntVal(ALIBAVA::AUTOMASKINGACTIVE);
+    }
+    streamlog_out(MESSAGE4) << _isAutoMaskingActive;
+
+    if(Global::parameters->isParameterSet(ALIBAVA::AUTOMASKINGCRITERIA))
+    {
+        _autoMaskingCriterium = Global::parameters->getFloatVal(ALIBAVA::AUTOMASKINGCRITERIA);
+    }
+    streamlog_out(MESSAGE4) << " ( if ON, using " << _autoMaskingCriterium 
+        << " sigmas )" << std::endl;
     
     // check signal Polarity
     if(_signalPolarity != -1)
@@ -163,11 +177,12 @@ void AlibavaSeedClustering::processRunHeader (LCRunHeader * rdr)
     
     // get and set selected chips
     this->setChipSelection(arunHeader->getChipSelection());
-    // set channels to be used (if it is defined)
-    this->setChannelsToBeUsed();
-	
+    
     // set pedestal and noise values
     this->setPedestals();
+    
+    // set channels to be used (if it is defined)
+    this->setChannelsToBeUsed();	
 	
     // if you want
     this->bookHistos();

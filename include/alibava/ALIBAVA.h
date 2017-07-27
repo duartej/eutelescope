@@ -69,12 +69,17 @@ namespace alibava
 	    static const int NOOFCHANNELS = 128;
             //! Parameter to store/recall length of header in a chip in Alibava readout system
             static const int CHIPHEADERLENGTH = 16;
+
 		
 	    /////////////////////////////////////////
 	    // Global Alibava Processor parameters //
 	    /////////////////////////////////////////
 	    static const char * CHANNELSTOBEUSED;
             static const char * SKIPMASKEDEVENTS;
+            //! Whether or not activate automasking noisy channels
+            static const char * AUTOMASKINGACTIVE;
+            //! The criteria to consider a channel noisy
+            static const char * AUTOMASKINGCRITERIA;
 		
 	    ////////////////////////
 	    // General Parameters //

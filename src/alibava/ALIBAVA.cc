@@ -18,6 +18,8 @@ using namespace std;
 // Global Alibava Processor parameters
 const char *   ALIBAVA::CHANNELSTOBEUSED    = "ChannelsToBeUsed";
 const char *   ALIBAVA::SKIPMASKEDEVENTS    = "SkipMaskedEvents";
+const char *   ALIBAVA::AUTOMASKINGACTIVE   = "AutoMaskingActive";
+const char *   ALIBAVA::AUTOMASKINGCRITERIA = "AutoMaskingCriterium";
 
 
 // General Parameters

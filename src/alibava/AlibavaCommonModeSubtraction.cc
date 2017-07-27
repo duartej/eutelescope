@@ -156,8 +156,8 @@ void AlibavaCommonModeSubtraction::processRunHeader (LCRunHeader * rdr)
     auto arunHeader = std::make_unique<AlibavaRunHeaderImpl>(rdr);
     arunHeader->addProcessor(type());
     
-    
     setChipSelection(arunHeader->getChipSelection());
+    
     // set channels to be used (if it is defined)
     setChannelsToBeUsed();
     

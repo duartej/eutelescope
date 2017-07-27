@@ -162,6 +162,7 @@ void AlibavaConstantCommonModeProcessor::processRunHeader (LCRunHeader * rdr)
     arunHeader->addProcessor(type());
     
     setChipSelection( arunHeader->getChipSelection() );
+    
     setChannelsToBeUsed();
     
     this->bookHistos(arunHeader->getNoOfEvents());
