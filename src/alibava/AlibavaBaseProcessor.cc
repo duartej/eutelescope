@@ -229,9 +229,70 @@ void AlibavaBaseProcessor::checkPedestals()
 }
 
 // [JDC]: disentangle the pedestals from the noise: TO Be deployed
-// setNoise()
-// checkNoise()
+void AlibavaBaseProcessor::setNoise()
+{
+    // first get selected chips
+    EVENT::IntVec selectedchips = getChipSelection();
+    if(getChipSelection().size()==0)
+    {
+        streamlog_out(ERROR5)<< "No selected chips found! Couldn't set the noise values!"<<endl;
+    }
+    AlibavaPedNoiCalIOManager man;
+    
+    // for each selected chip, get and save pedestal and noise values
+    for(auto chipnum: getChipSelection()) 
+    {
+	// if noiseCollectionName set
+        if(getNoiseCollectionName()!= string(ALIBAVA::NOTSET))
+        {
+            // get noise for this chip
+            _noiseMap.insert(std::make_pair(chipnum, 
+                        man.getPedNoiCalForChip(_pedestalFile,_noiseCollectionName, chipnum)));
+        }
+        else
+        {
+            streamlog_out(DEBUG5)<< "The noise values for chip "<<chipnum
+                <<" is not set, since noiseCollectionName is not set!"<<std::endl;
+        }
+    }
+    checkNoise();
+}
 
+void AlibavaBaseProcessor::checkNoise()
+{
+    _isNoiseValid = true;
+    
+    if(getChipSelection().size()==0)
+    {
+        streamlog_out(ERROR5)<< "No selected chips found! Couldn't "
+            <<"set the pedestal, noise values!"<<std::endl;
+    }
+    
+    // for each selected chip get and save pedestal and noise values
+    for(const auto & chipnum: getChipSelection())
+    {
+        if(getNoiseCollectionName()!= std::string(ALIBAVA::NOTSET))
+        {
+            // check noise values for this chip
+            if(int(_noiseMap[chipnum].size()) != ALIBAVA::NOOFCHANNELS)
+            {
+                streamlog_out(ERROR5)<< "The noise values for chip "
+                    <<chipnum<<" is not set properly!"<<std::endl;
+                _isNoiseValid = false;
+            }
+        }
+    }
+    
+    if(_isNoiseValid)
+    {
+        streamlog_out(MESSAGE5)<< "The noise values for all selected chips are valid!"<<std::endl;
+        this->printOutPedNoiCalCollection(this->_noiseMap);
+    }
+    else
+    {
+        streamlog_out(WARNING5)<< "The noise values for all selected chips are not set properly!"<<std::endl;
+    }	
+}
 
 ///////////////////////////
 // Pedestal
@@ -428,9 +489,7 @@ void AlibavaBaseProcessor::checkCalibration()
     else
     {
         streamlog_out(ERROR5)<< "No selected chips found! Couldn't set calibration values!"<<std::endl;
-        _isCalibrationValid = false;
     }
-	
 }
 
 

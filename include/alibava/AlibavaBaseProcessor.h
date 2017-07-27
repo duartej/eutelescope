@@ -83,6 +83,13 @@ namespace alibava {
 		// Checks the size and existance of the pedestal and noise values of each selected chips
 		void checkPedestals();
 		
+                // Sets (only) noise values
+		// Note that chip selection and noise collection names have to be set before calling this method.
+		void setNoise();
+		
+		// Checks the size and existance of the noise values of each selected chips
+		void checkNoise();
+		
 		///////////////////////////
 		// Pedestal
 		///////////////////////////
