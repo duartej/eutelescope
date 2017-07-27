@@ -420,6 +420,12 @@ void AlibavaConverter::readDataSource(int /* numEvents */)
         // Free memory
         delete anEvent;
     }while( !(infile.bad() || infile.eof()) );
+
+    /*
+    runHeader->setNoOfEvents(eventCounter);
+    ProcessorMgr::instance()->modifyRunHeader(runHeader->lcRunHeader());
+    delete arunHeader;
+    delete runHeader;*/
     
     infile.close();
     if(_stopEventNum!=-1 && eventCounter<_stopEventNum)

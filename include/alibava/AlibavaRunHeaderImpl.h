@@ -22,45 +22,43 @@
 
 // system includes <>
 
-namespace alibava {
-
-  //! Implementation of the Run Header for the Alibava readout system
-  /*! This is used to store the run header into the LCIO files produced 
-	*  both by the Alibava system. This class is using the decorator pattern 
-	*  around the LCRunHeaderImpl. The following parameters have been defined:
-   *
-   *  \li <b>HeaderVersion</b>: a float number representing the
-   *  version of this header class. Standard version number v01-23-04
-   *  are converted in a float number like 1.2304.
-   *
-	// Author: Eda Yildirim, DESY <mailto:eda.yildirim@desy.de>
+namespace alibava 
+{
+    //! Implementation of the Run Header for the Alibava readout system
+    /*! This is used to store the run header into the LCIO files produced 
+     *  both by the Alibava system. This class is using the decorator pattern 
+     *  around the LCRunHeaderImpl. The following parameters have been defined:
+     *
+     *  \li <b>HeaderVersion</b>: a float number representing the
+     *  version of this header class. Standard version number v01-23-04
+     *  are converted in a float number like 1.2304.
+     *
+        // Author: Eda Yildirim, DESY <mailto:eda.yildirim@desy.de>
 	// Based on EUTelRunHeaderImpl.cc written by Antonio Bulgheroni, INFN <mailto:antonio.bulgheroni@gmail.com>
-   *
-   */
+        // Modified by: Jordi Duarte-Campderros CERN-IFCA <mailto:jorge.duarte.campderros@cern.ch>
+        //              Mainly improved readability, and fix the event number extraction
+     *
+     */
 
-	class AlibavaRunHeaderImpl {
-
-  public:
-    
-    //! Default constructor
-//		AlibavaRunHeaderImpl ( ) : _lcHeader(NULL) {};
-		AlibavaRunHeaderImpl ( lcio::LCRunHeader * lcHeader ) : _lcHeader(NULL) { _lcHeader = dynamic_cast<IMPL::LCRunHeaderImpl*> (lcHeader) ; }
-
-    //! Destructor
-    virtual ~ AlibavaRunHeaderImpl ()  { /* NO-OP */ ;  }
-
-		//! Set the run number
-		/*! this is an integer storing the run number of alibava data file
-		 *
-		 *  @param arunnum The run number the user wants to set
-		 */
-		virtual void setRunNumber (int runnum);
-		
-		//! return the header
-		inline int getRunNumber () const    {
-			return _lcHeader->getRunNumber();
-		}
-
+class AlibavaRunHeaderImpl 
+{
+    public:
+        //! Default constructor
+        // AlibavaRunHeaderImpl ( ) : _lcHeader(NULL) {};
+	AlibavaRunHeaderImpl(lcio::LCRunHeader * lcHeader): _lcHeader(NULL) { _lcHeader = dynamic_cast<IMPL::LCRunHeaderImpl*> (lcHeader) ; }
+        
+        //! Destructor
+        virtual ~ AlibavaRunHeaderImpl ()  { /* NO-OP */ ;  }
+        
+        //! Set the run number
+	/*! this is an integer storing the run number of alibava data file
+	 *
+	 *  @param arunnum The run number the user wants to set
+	 */
+	virtual void setRunNumber (int runnum);
+	
+	//! return the header
+	inline int getRunNumber () const { return _lcHeader->getRunNumber(); }
 
 	//! Set detector name
 	/*! this is a string storing the detector name 
@@ -70,21 +68,17 @@ namespace alibava {
 	virtual void setDetectorName (std::string name);
 	
 	//! return the header
-	inline std::string getDetectorName() const    {
-	return _lcHeader->getDetectorName();
-        }
+	inline std::string getDetectorName() const {return _lcHeader->getDetectorName(); }
 		
-	  //! Set the header
-	  /*! this is a string storing the header of alibava data file
-		*
-		*  @param aheader The version number the user wants to set
-		*/
-	  virtual void setHeader (std::string aheader);
+	//! Set the header
+	/*! this is a string storing the header of alibava data file
+	 *
+	 *  @param aheader The version number the user wants to set
+	 */
+	virtual void setHeader (std::string aheader);
      
-	  //! return the header
-		inline std::string getHeader () const    {
-		  return _lcHeader->parameters().getStringVal (ALIBAVA::HEADER);
-	  }
+	//! return the header
+	inline std::string getHeader () const {return _lcHeader->parameters().getStringVal(ALIBAVA::HEADER);}
 
 	  
     //! Set the header version number
