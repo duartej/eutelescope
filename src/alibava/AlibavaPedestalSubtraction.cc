@@ -112,20 +112,6 @@ void AlibavaPedestalSubtraction::init()
         streamlog_out ( MESSAGE4 ) << "The Global Parameter "
             << ALIBAVA::SKIPMASKEDEVENTS <<" is not set! Masked events will be used!" << std::endl;
     }
-    // Whether to activate or not the noisy channel auto masking
-    streamlog_out(MESSAGE4) << "Noisy channel auto-masking is ";
-    if(Global::parameters->isParameterSet(ALIBAVA::AUTOMASKINGACTIVE))
-    {
-        _isAutoMaskingActive = Global::parameters->getIntVal(ALIBAVA::AUTOMASKINGACTIVE);
-    }
-    streamlog_out(MESSAGE4) << _isAutoMaskingActive;
-
-    if(Global::parameters->isParameterSet(ALIBAVA::AUTOMASKINGCRITERIA))
-    {
-        _autoMaskingCriterium = Global::parameters->getFloatVal(ALIBAVA::AUTOMASKINGCRITERIA);
-    }
-    streamlog_out(MESSAGE4) << " ( if ON, using " << _autoMaskingCriterium 
-        << " sigmas )" << std::endl;
     // this method is called only once even when the rewind is active
     // usually a good idea to
     printParameters ();
