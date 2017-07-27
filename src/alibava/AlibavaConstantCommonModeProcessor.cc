@@ -114,6 +114,15 @@ AlibavaConstantCommonModeProcessor::AlibavaConstantCommonModeProcessor () :
     registerOptionalParameter("MinADCsCountsErrorForHistograms",
             "The min ADCs counts for the common mode error which define the ranges of the histograms",
             _adcmin_err, float(0.0) );
+    
+    registerProcessorParameter ("NoiseInputFile",
+            "The filename where the noise is stored in order to be used for the noise channels auto-masking"\
+            ". Only needed if the auto-masking is enabled",
+            _pedestalFile , string("pedestal.slcio"));
+    
+    registerProcessorParameter ("NoiseCollectionName",
+            "Noise collection name stored in the NoiseInputFile",
+            _noiseCollectionName, string ("noise"));
 }
 
 void AlibavaConstantCommonModeProcessor::init()
@@ -136,6 +145,20 @@ void AlibavaConstantCommonModeProcessor::init()
         streamlog_out ( MESSAGE4 ) << "The Global Parameter "<< ALIBAVA::CHANNELSTOBEUSED 
             <<" is not set! All channels will be used!" << std::endl;
     }
+    // Whether to activate or not the noisy channel auto masking
+    streamlog_out(MESSAGE4) << "Noisy channel auto-masking is ";
+    if(Global::parameters->isParameterSet(ALIBAVA::AUTOMASKINGACTIVE))
+    {
+        _isAutoMaskingActive = Global::parameters->getIntVal(ALIBAVA::AUTOMASKINGACTIVE);
+    }
+    streamlog_out(MESSAGE4) << _isAutoMaskingActive;
+
+    if(Global::parameters->isParameterSet(ALIBAVA::AUTOMASKINGCRITERIA))
+    {
+        _autoMaskingCriterium = Global::parameters->getFloatVal(ALIBAVA::AUTOMASKINGCRITERIA);
+    }
+    streamlog_out(MESSAGE4) << " ( if ON, using " << _autoMaskingCriterium 
+        << " sigmas )" << std::endl;
     
     /* To choose if processor should skip masked events
      * ex. Set the value to 0 for false, to 1 for true
@@ -162,6 +185,11 @@ void AlibavaConstantCommonModeProcessor::processRunHeader (LCRunHeader * rdr)
     arunHeader->addProcessor(type());
     
     setChipSelection( arunHeader->getChipSelection() );
+
+    if( this->_isAutoMaskingActive )
+    {
+        this->setNoise();
+    }
     
     setChannelsToBeUsed();
     
