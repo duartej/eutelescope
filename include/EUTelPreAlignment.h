@@ -40,86 +40,105 @@
 #include <vector>
 
 
-namespace eutelescope {
-  class PreAligner{
-  private:
-    float pitchX, pitchY;
-    std::vector<int> histoX, histoY;
-    float minX, maxX;
-    float range;
-    float zPos;
-    int iden;
-    float getMaxBin(std::vector<int>& histo){
-      int maxBin(0), maxVal(0);
-      for(size_t ii = 0; ii < histo.size(); ii++){
-	if(histo.at(ii) > maxVal){ 
-	  maxBin = ii; 
-	  maxVal = histo.at(ii);
-	}
-      }
-      //Get weighted position from 3 neighboring bins
-      // as long as we are not on the edges of our histogram:
-      if(maxBin== 0 || maxBin== static_cast< int >(histo.size())){ 
-	streamlog_out( WARNING3 ) << "At least one sensor frame might be empty or heavily misaligned. Please check the GEAR file!" << " MaxBin: " << maxBin << " histo.size(): " << histo.size()  << std::endl; 
-	return static_cast< float >(maxBin);
-      }
-      float weight(0.0);
-      double pos1(0.0);
-      double pos2(0.0);
-      double pos3(0.0);
-
-      try
-	{
-	  // use logarithms to be on the safe side even with large number of
-	  // bin entries
-	  pos1 = log(maxBin-1)+log(histo.at(maxBin-1));
-	  pos2 = log(maxBin)+log(histo.at(maxBin));
-	  pos3 = log(maxBin+1)+ log(histo.at(maxBin+1));
-	  weight = log((histo.at(maxBin-1)) + (histo.at(maxBin)) + (histo.at(maxBin+1)));
-	}
-      catch(...)
-	{
-	  streamlog_out( ERROR ) << "Could not execute prealignment bin content retrieval. The sensor frame might be empty or heavily misaligned. Please check the GEAR file!" << std::endl; 
-	}
-      return(exp(pos1-weight)+exp(pos2-weight)+exp(pos3-weight));
-    }
-  public:
-    PreAligner(float pitchX, float pitchY, float zPos, int iden): 
-      pitchX(pitchX), pitchY(pitchY), 
-      minX(-40.0), maxX(40), range(maxX - minX),
-      zPos(zPos), iden(iden){
-      // Checkk not zero
-      if( pitchX < 1e-15 || pitchY < 1e-15 )
-      { 
-          streamlog_out(ERROR) << "Pitch must be higher than 0! Check the gear file descriptor," 
-              << " either pitchX or pitchY for sensor " << iden << " is zero " << std::endl;
-          throw std::runtime_error("PreAligner constructor: Pitch must be higher than 0");
-      }
-
-      histoX.assign( int( range / pitchX ), 0);
-      histoY.assign( int( range / pitchY ), 0);
-    }
-    void* current(){return this; } 
-    float getZPos() const { return(zPos); }
-    int getIden() const { return(iden); }
-    void addPoint(float x, float y){
-      //Add to histo if within bounds, throw away data that is out of bounds
-      try{
-	histoX.at( static_cast<int> ( (x - minX)/pitchX) ) += 1; 
-      } catch (std::out_of_range& e) {;}
-      try{
-	histoY.at( static_cast<int> ( (y - minX)/pitchY) ) += 1; 
-      } catch (std::out_of_range& e) {;}
-    }
-    float getPeakX(){
-      return( (getMaxBin(histoX) * pitchX) + minX) ;
-    }
-    float getPeakY(){
-      return( (getMaxBin(histoY) * pitchY) + minX) ;
-    }
-
-
-  }; // class PreAligner
+namespace eutelescope 
+{
+    class PreAligner
+    {
+        private:
+            float pitchX, pitchY;
+            std::vector<int> histoX, histoY;
+            float minX, maxX;
+            float range;
+            float zPos;
+            int iden;
+            float getMaxBin(std::vector<int>& histo)
+            {
+                int maxBin(0), maxVal(0);
+                for(size_t ii = 0; ii < histo.size(); ii++)
+                {
+                    if(histo.at(ii) > maxVal)
+                    { 
+                        maxBin = ii; 
+                        maxVal = histo.at(ii);
+                    }
+                }
+                //Get weighted position from 3 neighboring bins
+                // as long as we are not on the edges of our histogram:
+                if(maxBin== 0 || maxBin== static_cast< int >(histo.size()))
+                { 
+                    streamlog_out( WARNING3 ) << "At least one sensor frame " 
+                        << "might be empty or heavily misaligned. Please check " 
+                        << "the GEAR file!" << " MaxBin: " << maxBin << " histo.size(): " 
+                        << histo.size()  << std::endl; 
+                    return static_cast< float >(maxBin);
+                }
+                float weight(0.0);
+                double pos1(0.0);
+                double pos2(0.0);
+                double pos3(0.0);
+                
+                try
+                {
+                    // use logarithms to be on the safe side even with large number of
+                    // bin entries
+                    pos1 = log(maxBin-1)+log(histo.at(maxBin-1));
+                    pos2 = log(maxBin)+log(histo.at(maxBin));
+                    pos3 = log(maxBin+1)+ log(histo.at(maxBin+1));
+                    weight = log((histo.at(maxBin-1)) + (histo.at(maxBin)) + (histo.at(maxBin+1)));
+                }
+                catch(...)
+                {
+                    streamlog_out( ERROR ) << "Could not execute prealignment bin "
+                        << "content retrieval. The sensor frame might be empty or " 
+                        << "heavily misaligned. Please check the GEAR file!" << std::endl; 
+                }
+                return(exp(pos1-weight)+exp(pos2-weight)+exp(pos3-weight));
+            }
+        public:
+            PreAligner(float pitchX, float pitchY, float zPos, int iden): 
+                pitchX(pitchX), 
+                pitchY(pitchY), 
+                minX(-40.0), 
+                maxX(40), 
+                range(maxX - minX),
+                zPos(zPos), iden(iden)
+            {
+                // Checkk not zero
+                if( pitchX < 1e-15 || pitchY < 1e-15 )
+                { 
+                    streamlog_out(ERROR) << "Pitch must be higher than 0! "
+                        << "Check the gear file descriptor," 
+                        << " either pitchX or pitchY for sensor " 
+                        << iden << " is zero " << std::endl;
+                    throw std::runtime_error("PreAligner constructor: Pitch must be higher than 0");
+                }
+                histoX.assign( int( range / pitchX ), 0);
+                histoY.assign( int( range / pitchY ), 0);
+            }
+            void* current(){return this; } 
+            float getZPos() const { return(zPos); }
+            int getIden() const { return(iden); }
+            void addPoint(float x, float y)
+            {
+                //Add to histo if within bounds, throw away data that is out of bounds
+                try
+                {
+                    histoX.at( static_cast<int> ( (x - minX)/pitchX) ) += 1; 
+                }
+                catch (std::out_of_range& e) {;}
+                try{
+                    histoY.at( static_cast<int> ( (y - minX)/pitchY) ) += 1; 
+                } catch (std::out_of_range& e) {;}
+            }
+            float getPeakX()
+            {
+                return( (getMaxBin(histoX) * pitchX) + minX) ;
+            }
+            float getPeakY()
+            {      
+                return( (getMaxBin(histoY) * pitchY) + minX) ;    
+            }
+    }; // class PreAligner
   
 
 
