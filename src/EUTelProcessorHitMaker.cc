@@ -386,7 +386,7 @@ void EUTelProcessorHitMaker::processEvent (LCEvent * event) {
                 double xDet = (xCoG + 0.5) * xPitch;
                 double yDet = (yCoG + 0.5) * yPitch; 
 
-                streamlog_out(MESSAGE) << "cluster[" << setw(4) << iCluster << "] on sensor[" << setw(3) << sensorID 
+                streamlog_out(DEBUG) << "cluster[" << setw(4) << iCluster << "] on sensor[" << setw(3) << sensorID 
                     << "] at [" << setw(8) << setprecision(7) << xCoG << ":" << setw(8) << setprecision(7) << yCoG << "]"
                     << " ->  [" << setw(8) << setprecision(3) << xDet << ":" << setw(8) << setprecision(3) << yDet << "]"
                     << endl;
