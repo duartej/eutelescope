@@ -88,6 +88,14 @@ namespace eutelescope {
       pitchX(pitchX), pitchY(pitchY), 
       minX(-40.0), maxX(40), range(maxX - minX),
       zPos(zPos), iden(iden){
+      // Checkk not zero
+      if( pitchX < 1e-15 || pitchY < 1e-15 )
+      { 
+          streamlog_out(ERROR) << "Pitch must be higher than 0! Check the gear file descriptor," 
+              << " either pitchX or pitchY for sensor " << iden << " is zero " << std::endl;
+          throw std::runtime_error("PreAligner constructor: Pitch must be higher than 0");
+      }
+
       histoX.assign( int( range / pitchX ), 0);
       histoY.assign( int( range / pitchY ), 0);
     }

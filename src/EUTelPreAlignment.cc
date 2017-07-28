@@ -88,53 +88,61 @@ EUTelPreAlign::EUTelPreAlign(): Processor("EUTelPreAlign")
   registerOptionalParameter("ExcludedPlanesYCoord", "The list of sensor IDs for which the Y coordinate  shall be excluded.", _ExcludedPlanesYCoord, std::vector<int>() );
 }
 
-void EUTelPreAlign::init () {
-	// this method is called only once even when the rewind is active
-	printParameters ();
+void EUTelPreAlign::init()
+{
+    _iRun = 0;  _iEvt = 0;
 
-	_iRun = 0;  _iEvt = 0;
+    _sensorIDVec = geo::gGeometry().sensorIDsVec();
+    _sensorIDtoZOrderMap.clear();
+    for(size_t index = 0; index < _sensorIDVec.size(); index++) 
+    {
+        _sensorIDtoZOrderMap.insert( std::make_pair(_sensorIDVec.at(index), (int)index) );
+    }
+    
+    for(std::vector<int>::iterator it = _sensorIDVec.begin(); it != _sensorIDVec.end(); it++) 
+    {
+        int sensorID = *it;
+        if(sensorID == _fixedID) 
+        {
+            _fixedZ = geo::gGeometry().siPlaneZPosition(sensorID); 
+        } 
+        else
+        {
+            _preAligners.push_back( PreAligner(	geo::gGeometry().siPlaneXPitch(sensorID)/10.,
+                        geo::gGeometry().siPlaneYPitch(sensorID)/10.,
+                        geo::gGeometry().siPlaneZPosition(sensorID),
+                        sensorID ) );	
+        }
+    }
 
-	_sensorIDVec = geo::gGeometry().sensorIDsVec();
-	_sensorIDtoZOrderMap.clear();
-	for(size_t index = 0; index < _sensorIDVec.size(); index++) {
-		_sensorIDtoZOrderMap.insert( std::make_pair(_sensorIDVec.at(index), (int)index) );
-	}
-
-	for( std::vector<int>::iterator it = _sensorIDVec.begin(); it != _sensorIDVec.end(); it++) {
-		int sensorID = *it;
-		if(sensorID == _fixedID) { 
-			_fixedZ = geo::gGeometry().siPlaneZPosition(sensorID); 
-		} else {
-			_preAligners.push_back( PreAligner(	geo::gGeometry().siPlaneXPitch(sensorID)/10.,
-					       			geo::gGeometry().siPlaneYPitch(sensorID)/10.,
-								geo::gGeometry().siPlaneZPosition(sensorID),
-								sensorID ) );	
-		}
-	}
-
-	#if defined(USE_AIDA) || defined(MARLIN_USE_AIDA)
+#if defined(USE_AIDA) || defined(MARLIN_USE_AIDA)
 	std::string tempHistoName = "";
 	std::string basePath; 
 
-	if( _fillHistos ) {
-		// Allow any plane to be the fixed reference:
-		for(size_t i = 0; i < _sensorIDVec.size(); i++) {
-			int sensorID = _sensorIDVec.at(i);
+	if( _fillHistos ) 
+        {
+            // Allow any plane to be the fixed reference:
+	    for(size_t i = 0; i < _sensorIDVec.size(); i++) 
+            {
+                int sensorID = _sensorIDVec.at(i);
 
-			basePath = "plane_" + to_string( sensorID );
-			AIDAProcessor::tree(this)->mkdir(basePath.c_str());
-			basePath.append("/");
+		basePath = "plane_" + to_string( sensorID );
+		AIDAProcessor::tree(this)->mkdir(basePath.c_str());
+		basePath.append("/");
+                  
+                tempHistoName = "hitXCorr_fixed_to_" + to_string( sensorID ) ;
+		AIDA::IHistogram1D * histo1Da = AIDAProcessor::histogramFactory(this)->createHistogram1D( (basePath + tempHistoName).c_str(), 100 , -10., 10.);
+		_hitXCorr.insert( make_pair( sensorID, histo1Da) );
 
-			tempHistoName = "hitXCorr_fixed_to_" + to_string( sensorID ) ;
-			AIDA::IHistogram1D * histo1Da = AIDAProcessor::histogramFactory(this)->createHistogram1D( (basePath + tempHistoName).c_str(), 100 , -10., 10.);
-			_hitXCorr.insert( make_pair( sensorID, histo1Da) );
-
-			tempHistoName = "hitYCorr_fixed_to_" + to_string( sensorID) ;
-			AIDA::IHistogram1D * histo1Db = AIDAProcessor::histogramFactory(this)->createHistogram1D( (basePath + tempHistoName).c_str(), 100 , -10., 10.) ;
-			_hitYCorr.insert( make_pair( sensorID, histo1Db) );
-		}
-	}
-	#endif
+		tempHistoName = "hitYCorr_fixed_to_" + to_string( sensorID) ;
+		AIDA::IHistogram1D * histo1Db = AIDAProcessor::histogramFactory(this)->createHistogram1D( (basePath + tempHistoName).c_str(), 100 , -10., 10.) ;
+		_hitYCorr.insert( make_pair( sensorID, histo1Db) );
+            }
+        }
+#endif
+    
+    // this method is called only once even when the rewind is active
+    printParameters ();
 }
 
 void EUTelPreAlign::processRunHeader(LCRunHeader* rdr) {
