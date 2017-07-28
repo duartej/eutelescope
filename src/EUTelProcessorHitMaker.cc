@@ -504,81 +504,83 @@ void EUTelProcessorHitMaker::end()
   streamlog_out ( MESSAGE4 )  << "Successfully finished" << endl;
 }
 
-void EUTelProcessorHitMaker::bookHistos(int sensorID) {
+void EUTelProcessorHitMaker::bookHistos(int sensorID) 
+{
 
 #if defined(USE_AIDA) || defined(MARLIN_USE_AIDA)
+    string tempHistoName;
+    string basePath = "plane_" + to_string( sensorID ) ;
+    AIDAProcessor::tree(this)->mkdir(basePath.c_str());
+    basePath = basePath + "/";
 
+    tempHistoName = _hitHistoLocalName + "_" + to_string( sensorID ) ;
 
-  string tempHistoName;
-  string basePath = "plane_" + to_string( sensorID ) ;
-  AIDAProcessor::tree(this)->mkdir(basePath.c_str());
-  basePath = basePath + "/";
+    //Note in the local frame the origin is at the centre of the sensor. So we want this to look for hits in the -x/y direction, as well at the + axis.
+    //We add and subtract a constant so we know for sure we can see all hits on the histogram.
+    const double constant=1.2;
+    double xMin =  -(geo::gGeometry().siPlaneXSize ( sensorID )/2)*constant;
+    double xMax = ( geo::gGeometry().siPlaneXSize ( sensorID )/2)*constant;   
 
-  tempHistoName = _hitHistoLocalName + "_" + to_string( sensorID ) ;
+    double yMin = -(geo::gGeometry().siPlaneYSize ( sensorID )/2)*constant;
+    double yMax = (geo::gGeometry().siPlaneYSize ( sensorID )/2)+constant; 
 
-	//Note in the local frame the origin is at the centre of the sensor. So we want this to look for hits in the -x/y direction, as well at the + axis.
-	//We add and subtract a constant so we know for sure we can see all hits on the histogram.
-	double constant=5;
-  double xMin =  -(geo::gGeometry().siPlaneXSize ( sensorID )/2)-constant;
-  double xMax = ( geo::gGeometry().siPlaneXSize ( sensorID )/2)+constant;   
+    int xNBin =    geo::gGeometry().siPlaneXNpixels ( sensorID );
+    int yNBin =    geo::gGeometry().siPlaneYNpixels ( sensorID );
 
-  double yMin = -(geo::gGeometry().siPlaneYSize ( sensorID )/2)-constant;
-  double yMax = (geo::gGeometry().siPlaneYSize ( sensorID )/2)+constant; 
+    AIDA::IHistogram2D * hitHistoLocal = AIDAProcessor::histogramFactory(this)->createHistogram2D( (basePath + tempHistoName).c_str(),
+            xNBin, xMin, xMax, yNBin, yMin, yMax );
+    if ( hitHistoLocal ) 
+    {
+        hitHistoLocal->setTitle("Hit map in the detector local frame of reference");
+        _aidaHistoMap.insert( make_pair( tempHistoName, hitHistoLocal ) );
+    } 
+    else 
+    {   
+        streamlog_out ( ERROR1 )  << "Problem booking the " << (basePath + tempHistoName) << ".\n"
+            << "Very likely a problem with path name. Switching off histogramming and continue w/o" << endl;
+        _histogramSwitch = false;
+    }
 
-  int xNBin =    geo::gGeometry().siPlaneXNpixels ( sensorID );
-  int yNBin =    geo::gGeometry().siPlaneYNpixels ( sensorID );
+    // Only book it if needed
+    if(!_wantLocalCoordinates)
+    {
+        // 2 should be enough because it
+        // means that the sensor is wrong
+        // by all its size.
+        const double safetyFactor = 1.2;
+        double xPosition =  geo::gGeometry().siPlaneXPosition( sensorID );
+        double yPosition =  geo::gGeometry().siPlaneYPosition( sensorID );
+        double xSize     =  geo::gGeometry().siPlaneXSize ( sensorID );
+        double ySize     =  geo::gGeometry().siPlaneYSize ( sensorID );
+        int xBin         =  geo::gGeometry().siPlaneXNpixels( sensorID );
+        int yBin         =  geo::gGeometry().siPlaneYNpixels( sensorID );
+        
+        xMin = safetyFactor * ( xPosition - ( 0.5 * xSize ));
+        xMax = safetyFactor * ( xPosition + ( 0.5 * xSize ));
 
+        yMin = safetyFactor * ( yPosition - ( 0.5 * ySize ));
+        yMax = safetyFactor * ( yPosition + ( 0.5 * ySize ));
 
-  AIDA::IHistogram2D * hitHistoLocal = AIDAProcessor::histogramFactory(this)->createHistogram2D( (basePath + tempHistoName).c_str(),
-                                                                                                 xNBin, xMin, xMax, yNBin, yMin, yMax );
-  if ( hitHistoLocal ) {
-    hitHistoLocal->setTitle("Hit map in the detector local frame of reference");
-    _aidaHistoMap.insert( make_pair( tempHistoName, hitHistoLocal ) );
-  } else {
-    streamlog_out ( ERROR1 )  << "Problem booking the " << (basePath + tempHistoName) << ".\n"
-                              << "Very likely a problem with path name. Switching off histogramming and continue w/o" << endl;
-    _histogramSwitch = false;
-  }
+        xNBin = static_cast< int > ( safetyFactor  * xBin );
+        yNBin = static_cast< int > ( safetyFactor  * yBin );
 
-  // 2 should be enough because it
-  // means that the sensor is wrong
-  // by all its size.
-  double safetyFactor = 1.2;
-  double xPosition =  geo::gGeometry().siPlaneXPosition( sensorID );
-  double yPosition =  geo::gGeometry().siPlaneYPosition( sensorID );
-  double xSize     =  geo::gGeometry().siPlaneXSize ( sensorID );
-  double ySize     =  geo::gGeometry().siPlaneYSize ( sensorID );
-  int xBin         =  geo::gGeometry().siPlaneXNpixels( sensorID );
-  int yBin         =  geo::gGeometry().siPlaneYNpixels( sensorID );
+        tempHistoName =  _hitHistoTelescopeName + "_" + to_string( sensorID );
+        AIDA::IHistogram2D * hitHistoTelescope =
+        AIDAProcessor::histogramFactory(this)->createHistogram2D( ( basePath + tempHistoName ).c_str(),
+                                                                  xNBin, xMin, xMax, yNBin, yMin, yMax );
 
-  xMin = safetyFactor * ( xPosition - ( 0.5 * xSize ));
-  xMax = safetyFactor * ( xPosition + ( 0.5 * xSize ));
-
-  yMin = safetyFactor * ( yPosition - ( 0.5 * ySize ));
-  yMax = safetyFactor * ( yPosition + ( 0.5 * ySize ));
-
-  xNBin = static_cast< int > ( safetyFactor  * xBin );
-  yNBin = static_cast< int > ( safetyFactor  * yBin );
-
-  tempHistoName =  _hitHistoTelescopeName + "_" + to_string( sensorID );
-  AIDA::IHistogram2D * hitHistoTelescope =
-    AIDAProcessor::histogramFactory(this)->createHistogram2D( ( basePath + tempHistoName ).c_str(),
-                                                              xNBin, xMin, xMax, yNBin, yMin, yMax );
-
-  if ( hitHistoTelescope ) {
-    hitHistoTelescope->setTitle("Hit map in the telescope frame of reference");
-    _aidaHistoMap.insert( make_pair ( tempHistoName, hitHistoTelescope ) );
-  } else {
-    streamlog_out ( ERROR1 )  << "Problem booking the " << (basePath + tempHistoName) << ".\n"
-                              << "Very likely a problem with path name. Switching off histogramming and continue w/o" << endl;
-    _histogramSwitch = false;
-  }
-
-
-
-
-  _alreadyBookedSensorID.insert( sensorID );
-
+        if(hitHistoTelescope ) 
+        {
+            hitHistoTelescope->setTitle("Hit map in the telescope frame of reference");
+            _aidaHistoMap.insert( make_pair ( tempHistoName, hitHistoTelescope ) );
+        } 
+        else 
+        {
+            streamlog_out ( ERROR1 )  << "Problem booking the " << (basePath + tempHistoName) << ".\n"
+                << "Very likely a problem with path name. Switching off histogramming and continue w/o" << endl;
+            _histogramSwitch = false;
+        }
+    }
+    _alreadyBookedSensorID.insert( sensorID );
 #endif // AIDA
-
 }
