@@ -202,7 +202,8 @@ void EUTelProcessorHitMaker::DumpReferenceHitDB() {
 }
 
 
-void EUTelProcessorHitMaker::processRunHeader (LCRunHeader * rdr) {
+void EUTelProcessorHitMaker::processRunHeader (LCRunHeader * rdr) 
+{
   std::unique_ptr<EUTelRunHeaderImpl> header = std::make_unique<EUTelRunHeaderImpl>(rdr);
   header->addProcessor(type());
 
@@ -273,241 +274,229 @@ void EUTelProcessorHitMaker::processEvent (LCEvent * event) {
 
 	for( int iCluster = 0; iCluster < pulseCollection->getNumberOfElements(); iCluster++ ) 
 	{
-			TrackerPulseImpl* pulse = dynamic_cast<TrackerPulseImpl*>(pulseCollection->getElementAt(iCluster));
-			TrackerDataImpl* trackerData  = dynamic_cast<TrackerDataImpl*>( pulse->getTrackerData());
+            TrackerPulseImpl* pulse = dynamic_cast<TrackerPulseImpl*>(pulseCollection->getElementAt(iCluster));
+            TrackerDataImpl* trackerData  = dynamic_cast<TrackerDataImpl*>( pulse->getTrackerData());
 
-			int sensorID = clusterCellDecoder(pulse)["sensorID"];
-			ClusterType clusterType = static_cast<ClusterType>( static_cast<int>(clusterCellDecoder(pulse)["type"]) );
-			SparsePixelType pixelType = static_cast<SparsePixelType>( static_cast<int>(cellDecoder(trackerData)["sparsePixelType"]) );
+	    int sensorID = clusterCellDecoder(pulse)["sensorID"];
+	    ClusterType clusterType = static_cast<ClusterType>( static_cast<int>(clusterCellDecoder(pulse)["type"]) );
+	    SparsePixelType pixelType = static_cast<SparsePixelType>( static_cast<int>(cellDecoder(trackerData)["sparsePixelType"]) );
+	    
+            // there could be several clusters belonging to the same
+            // detector. So update the geometry information only if this new
+	    // cluster belongs to a different detector.
+	    // superseeded with above ;; sensorID = cluster->getDetectorID();
 
-			// there could be several clusters belonging to the same
-			// detector. So update the geometry information only if this new
-			// cluster belongs to a different detector.
-			// superseeded with above ;; sensorID = cluster->getDetectorID();
+	    if( sensorID != oldDetectorID ) 
+            {
+                oldDetectorID = sensorID;
+                
+                //check if the histos for this sensor ID have been booked already.
+		if ( _alreadyBookedSensorID.find( sensorID ) == _alreadyBookedSensorID.end() )
+                {
+                    bookHistos( sensorID );
+                }
+    
+                resolutionX  = geo::gGeometry().siPlaneXResolution( sensorID );// mm
+                resolutionY  = geo::gGeometry().siPlaneYResolution( sensorID );// mm
 
-			if( sensorID != oldDetectorID ) 
-			{
-					oldDetectorID = sensorID;
+		xSize        = geo::gGeometry().siPlaneXSize ( sensorID );    // mm
+		ySize        = geo::gGeometry().siPlaneYSize ( sensorID );    // mm
 
-					//check if the histos for this sensor ID have been booked already.
-					if ( _alreadyBookedSensorID.find( sensorID ) == _alreadyBookedSensorID.end() )
-					{
-							bookHistos( sensorID );
-					}
+                xPitch       = geo::gGeometry().siPlaneXPitch( sensorID );    // mm
+                yPitch       = geo::gGeometry().siPlaneYPitch( sensorID );    // mm
 
-					resolutionX  = geo::gGeometry().siPlaneXResolution( sensorID );// mm
-					resolutionY  = geo::gGeometry().siPlaneYResolution( sensorID );// mm
-
-					xSize        = geo::gGeometry().siPlaneXSize ( sensorID );    // mm
-					ySize        = geo::gGeometry().siPlaneYSize ( sensorID );    // mm
-
-					xPitch       = geo::gGeometry().siPlaneXPitch( sensorID );    // mm
-					yPitch       = geo::gGeometry().siPlaneYPitch( sensorID );    // mm
-
-			}
-
-
-			// LOCAL coordinate system !!!!!!
-			double telPos[3];
+            }
+            // LOCAL coordinate system !!!!!!
+	    double telPos[3];
 			
-			if(clusterType == kEUTelGenericSparseClusterImpl)
-			{
-				float xPos = 0;
-				float yPos = 0;
+            if(clusterType == kEUTelGenericSparseClusterImpl)
+            {
+                float xPos = 0;
+                float yPos = 0;
+                
+                //in the case of genericSparseCluster we need to know the underlying pixel type
+                if(pixelType == kEUTelGenericSparsePixel)
+                {
+                    EUTelGenericSparseClusterImpl<EUTelGenericSparsePixel> cluster (trackerData);
+                    cluster.getCenterOfGravity(xPos, yPos);
+                    
+                    //For non geometric clusters, getCenterOfGravity will return it in pixel indices space, i.e.
+                    //we still have to transform into mm via the dimensions
+                    xPos = (xPos + 0.5) * xPitch - xSize/2.;
+                    yPos = (yPos + 0.5) * yPitch - ySize/2.;
+                }
+                else if(pixelType == kEUTelGeometricPixel)
+                {
+                    EUTelGeometricClusterImpl cluster(trackerData);
+                    cluster.getGeometricCenterOfGravity(xPos, yPos);
+                }
+                else
+                {
+                    streamlog_out( ERROR4 ) << "We do not support pixel type: " << pixelType << " for kEUTelGenericSparseClusterImpl" << std::endl;
+		    throw UnknownDataTypeException("Pixel type not supported for kEUTelGenericSparseClusterImpl");
+                }
+		telPos[0] = xPos;
+                telPos[1] = yPos;
+                telPos[2] = 0;
+            }
+            else
+            {
+                EUTelSparseClusterImpl<EUTelGenericSparsePixel>* cluster = new EUTelSparseClusterImpl<EUTelGenericSparsePixel>(trackerData);
+                
+                // get the position of the seed pixel. This is in pixel number.
+		int xCluSeed = 0;
+		int yCluSeed = 0;
+		cluster->getSeedCoord(xCluSeed, yCluSeed);
 
-				//in the case of genericSparseCluster we need to know the underlying pixel type
-				if(pixelType == kEUTelGenericSparsePixel)
-				{
-					EUTelGenericSparseClusterImpl<EUTelGenericSparsePixel> cluster (trackerData);
-					cluster.getCenterOfGravity(xPos, yPos);
+		// with the charge center of gravity calculation, we get a shift
+		// from the seed pixel center due to the charge distribution. Those
+		// two numbers are the correction values in the case the Eta
+		// correction is not applied.
+		//!HACK TAKI:
+		//! In case of a bricked cluster, we have to make sure to get the normal CoG first.
+		//! The one without the global seed coordinate correction (caused by pixel rows being skewed).
+		//! That one has to be eta-corrected and the global coordinate correction has to be applied on top of that!
+		//! So prepare a brickedCluster pointer now:
+		EUTelBrickedClusterImpl* p_tmpBrickedCluster = NULL;
+        	if( clusterType == kEUTelBrickedClusterImpl )
+                {
+                    p_tmpBrickedCluster = dynamic_cast< EUTelBrickedClusterImpl* >(cluster);
+		    if (p_tmpBrickedCluster == NULL)
+                    {
+                        streamlog_out ( ERROR4 ) << " .COULD NOT CREATE EUTelBrickedClusterImpl* !!!" << endl;
+			throw UnknownDataTypeException("COULD NOT CREATE EUTelBrickedClusterImpl* !!!");
+                    }
+                }
+    		/* See below, performed in one line
+                 * float xShift = 0.;
+		float yShift = 0.;
+                
+                cluster->getCenterOfGravityShift( xShift, yShift );
 
-					//For non geometric clusters, getCenterOfGravity will return it in pixel indices space, i.e.
-					//we still have to transform into mm via the dimensions
-					xPos = (xPos + 0.5) * xPitch - xSize/2.;
-					yPos = (yPos + 0.5) * yPitch - ySize/2.;
-		
-				}
+		double xCorrection = static_cast<double> (xShift) ;
+		double yCorrection = static_cast<double> (yShift) ;
 
-				else if(pixelType == kEUTelGeometricPixel)
-				{
-					
-					EUTelGeometricClusterImpl cluster(trackerData);
-					cluster.getGeometricCenterOfGravity(xPos, yPos);
-				}
+                // rescale the pixel number in millimeter
+		double xDet = ( static_cast<double> (xCluSeed) + xCorrection + 0.5 ) * xPitch ;
+		double yDet = ( static_cast<double> (yCluSeed) + yCorrection + 0.5 ) * yPitch ;*/
 
-				else
-				{
-					//ERROR
-					streamlog_out( ERROR4 ) << "We do not support pixel type: " << pixelType << " for kEUTelGenericSparseClusterImpl" << std::endl;
-					throw UnknownDataTypeException("Pixel type not supported for kEUTelGenericSparseClusterImpl");
-				}
+                // check the hack from Havard:
+                float xCoG(0.0f), yCoG(0.0f);
+                cluster->getCenterOfGravity(xCoG, yCoG);
+                double xDet = (xCoG + 0.5) * xPitch;
+                double yDet = (yCoG + 0.5) * yPitch; 
 
-				telPos[0] = xPos;
-				telPos[1] = yPos;
-				telPos[2] = 0;
-			}
-
-			else
-			{
-					EUTelSparseClusterImpl<EUTelGenericSparsePixel>* cluster = new EUTelSparseClusterImpl<EUTelGenericSparsePixel>(trackerData);
-
-					// get the position of the seed pixel. This is in pixel number.
-					int xCluSeed = 0;
-					int yCluSeed = 0;
-					cluster->getSeedCoord(xCluSeed, yCluSeed);
-
-					// with the charge center of gravity calculation, we get a shift
-					// from the seed pixel center due to the charge distribution. Those
-					// two numbers are the correction values in the case the Eta
-					// correction is not applied.
-
-					//!HACK TAKI:
-					//! In case of a bricked cluster, we have to make sure to get the normal CoG first.
-					//! The one without the global seed coordinate correction (caused by pixel rows being skewed).
-					//! That one has to be eta-corrected and the global coordinate correction has to be applied on top of that!
-					//! So prepare a brickedCluster pointer now:
-
-					EUTelBrickedClusterImpl* p_tmpBrickedCluster = NULL;
-					if ( clusterType == kEUTelBrickedClusterImpl )
-					{
-							p_tmpBrickedCluster = dynamic_cast< EUTelBrickedClusterImpl* >(cluster);
-							if (p_tmpBrickedCluster == NULL)
-							{
-									streamlog_out ( ERROR4 ) << " .COULD NOT CREATE EUTelBrickedClusterImpl* !!!" << endl;
-									throw UnknownDataTypeException("COULD NOT CREATE EUTelBrickedClusterImpl* !!!");
-							}
-					}
-
-					float xShift = 0.;
-					float yShift = 0.;
-
-					cluster->getCenterOfGravityShift( xShift, yShift );
-
-					double xCorrection = static_cast<double> (xShift) ;
-					double yCorrection = static_cast<double> (yShift) ;
-
-					// rescale the pixel number in millimeter
-					double xDet = ( static_cast<double> (xCluSeed) + xCorrection + 0.5 ) * xPitch ;
-					double yDet = ( static_cast<double> (yCluSeed) + yCorrection + 0.5 ) * yPitch ;
-
-					// check the hack from Havard:
-					float xCoG(0.0f), yCoG(0.0f);
-					cluster->getCenterOfGravity(xCoG, yCoG);
-					xDet = (xCoG + 0.5) * xPitch;
-					yDet = (yCoG + 0.5) * yPitch; 
-
-					streamlog_out(DEBUG1) << "cluster[" << setw(4) << iCluster << "] on sensor[" << setw(3) << sensorID 
-							<< "] at [" << setw(8) << setprecision(3) << xCoG << ":" << setw(8) << setprecision(3) << yCoG << "]"
-							<< " ->  [" << setw(8) << setprecision(3) << xDet << ":" << setw(8) << setprecision(3) << yDet << "]"
-							<< endl;
-
-					//We have calculated the cluster hit position in terms of distance along the X and Y axis.
-					//However we still fo not have the sensor centre as the origin of the coordinate system.
-					//To do this we need to deduct xSize/2 and ySize/2 for the respective cluster X/Y position 
+                streamlog_out(MESSAGE) << "cluster[" << setw(4) << iCluster << "] on sensor[" << setw(3) << sensorID 
+                    << "] at [" << setw(8) << setprecision(7) << xCoG << ":" << setw(8) << setprecision(7) << yCoG << "]"
+                    << " ->  [" << setw(8) << setprecision(3) << xDet << ":" << setw(8) << setprecision(3) << yDet << "]"
+                    << endl;
+                
+                //We have calculated the cluster hit position in terms of distance along the X and Y axis.
+                //However we still fo not have the sensor centre as the origin of the coordinate system.
+                //To do this we need to deduct xSize/2 and ySize/2 for the respective cluster X/Y position 
+                telPos[0] = xDet - xSize/2. ;
+                telPos[1] = yDet - ySize/2. ; 
+                telPos[2] =   0.;
+                
+                delete cluster;
+                cluster = nullptr;
+            }
 
 
-					telPos[0] = xDet - xSize/2. ;
-					telPos[1] = yDet - ySize/2. ; 
-					telPos[2] =   0.;
-
-					delete cluster;
-					cluster = nullptr;
-			}
-
-
-			//We now plot the the hits in the EUTelescope local frame. This frame has the coordinate centre at the sensor centre.
+            //We now plot the the hits in the EUTelescope local frame. This frame has the coordinate centre at the sensor centre.
 #if defined(USE_AIDA) || defined(MARLIN_USE_AIDA)
-			string tempHistoName;
-			if ( _histogramSwitch ) 
-			{
-					tempHistoName =  _hitHistoLocalName + "_" + to_string( sensorID );
-					if ( AIDA::IHistogram2D* histo = dynamic_cast<AIDA::IHistogram2D*>(_aidaHistoMap[ tempHistoName ]) )
-					{
-							histo->fill(telPos[0], telPos[1]);
-					}
-					else 
-					{
-							streamlog_out ( ERROR1 )  << "Not able to retrieve histogram pointer for " << tempHistoName
-									<< ".\nDisabling histogramming from now on " << endl;
-							_histogramSwitch = false;
-					}
-			}
+            std::string tempHistoName;
+	    if( _histogramSwitch ) 
+            {
+                tempHistoName =  _hitHistoLocalName + "_" + to_string( sensorID );
+                if( AIDA::IHistogram2D* histo = dynamic_cast<AIDA::IHistogram2D*>(_aidaHistoMap[ tempHistoName ]) )
+                {
+                    histo->fill(telPos[0], telPos[1]);
+                }
+                else 
+                {
+                    streamlog_out ( ERROR1 )  << "Not able to retrieve histogram pointer for " << tempHistoName
+                        << ".\nDisabling histogramming from now on " << endl;
+                    _histogramSwitch = false;
+                }
+            }
 #endif
-
-
-			if ( !_wantLocalCoordinates ) {
-					// 
-					// NOW !!
-					// GLOBAL coordinate system !!!
-
-					const double localPos[3] = { telPos[0], telPos[1], telPos[2] };
-					geo::gGeometry().local2Master( sensorID, localPos, telPos);
-
-			}
-
+            if ( !_wantLocalCoordinates ) 
+            {
+                // 
+                // NOW !!
+                // GLOBAL coordinate system !!!
+                const double localPos[3] = { telPos[0], telPos[1], telPos[2] };
+                geo::gGeometry().local2Master( sensorID, localPos, telPos);
 #if defined(USE_AIDA) || defined(MARLIN_USE_AIDA)
-			if ( _histogramSwitch ) 
-			{
-					tempHistoName = _hitHistoTelescopeName + "_" + to_string( sensorID );
-					AIDA::IHistogram2D * histo2D = dynamic_cast<AIDA::IHistogram2D*> (_aidaHistoMap[ tempHistoName ] );
-					if ( histo2D )
-					{
-							histo2D->fill( telPos[0], telPos[1] );
-					}
-					else 
-					{
-							streamlog_out ( ERROR1 )  << "Not able to retrieve histogram pointer for " << tempHistoName
-									<< ".\nDisabling histogramming from now on " << endl;
-							_histogramSwitch = false;
-					}
-
-			}
+                if( _histogramSwitch ) 
+                {
+                    tempHistoName = _hitHistoTelescopeName + "_" + to_string( sensorID );
+                    AIDA::IHistogram2D * histo2D = dynamic_cast<AIDA::IHistogram2D*> (_aidaHistoMap[ tempHistoName ] );
+                    if( histo2D )
+                    {
+                        histo2D->fill( localPos[0], localPos[1] );
+                    }
+                    else 
+                    {
+                        streamlog_out ( ERROR1 )  << "Not able to retrieve histogram pointer for " << tempHistoName
+                            << ".\nDisabling histogramming from now on " << endl;
+                        _histogramSwitch = false;
+                    }
+                }
 #endif
+            }
 
-			// create the new hit
-			TrackerHitImpl* hit = new TrackerHitImpl;
-
-			hit->setPosition( &telPos[0] );
-			float cov[TRKHITNCOVMATRIX] = {0.,0.,0.,0.,0.,0.};
-			double resx = resolutionX;
-			double resy = resolutionY;
-			cov[0] = resx * resx; // cov(x,x)
-			cov[2] = resy * resy; // cov(y,y)
-			hit->setCovMatrix( cov );
-			hit->setType( clusterType  );
+            // create the new hit
+	    TrackerHitImpl* hit = new TrackerHitImpl;
+            
+            hit->setPosition( &telPos[0] );
+            float cov[TRKHITNCOVMATRIX] = {0.,0.,0.,0.,0.,0.};
+            double resx = resolutionX;
+            double resy = resolutionY;
+            cov[0] = resx * resx; // cov(x,x)
+            cov[2] = resy * resy; // cov(y,y)
+            hit->setCovMatrix( cov );
+            hit->setType( clusterType  );
             hit->setTime( pulse->getTime() );
 
-			// prepare a LCObjectVec to store the current cluster
-			LCObjectVec clusterVec;
-			clusterVec.push_back( trackerData );
+            // prepare a LCObjectVec to store the current cluster
+            LCObjectVec clusterVec;
+            clusterVec.push_back( trackerData );
 
-			// add the clusterVec to the hit
-			hit->rawHits() = clusterVec;
+            // add the clusterVec to the hit
+	    hit->rawHits() = clusterVec;
 
-			// Determine sensorID from the cluster data.
-			idHitEncoder["sensorID"] =  sensorID ;
+            // Determine sensorID from the cluster data.
+	    idHitEncoder["sensorID"] =  sensorID ;
 
-			// set the local/global bit flag property for the hit
-			idHitEncoder["properties"] = 0; // init
-			if (!_wantLocalCoordinates) idHitEncoder["properties"] = kHitInGlobalCoord;
+            // set the local/global bit flag property for the hit
+	    idHitEncoder["properties"] = 0; // init
+	    if(!_wantLocalCoordinates) 
+            {
+                idHitEncoder["properties"] = kHitInGlobalCoord;
+            }
+            
+            // store values
+	    idHitEncoder.setCellID( hit );
 
-			// store values
-			idHitEncoder.setCellID( hit );
-
-			// add the new hit to the hit collection
-			hitCollection->push_back( hit );
-	}
-
-    try
-    { 
-      event->getCollection( _hitCollectionName ) ;
-    }
-    catch(...)
-    {
-      event->addCollection( hitCollection, _hitCollectionName );
-    }
-
-    if ( isFirstEvent() ) _isFirstEvent = false;
+	    // add the new hit to the hit collection
+	    hitCollection->push_back( hit );
+        }
+        
+        try
+        { 
+            event->getCollection( _hitCollectionName ) ;
+        }
+        catch(...)
+        {
+            event->addCollection( hitCollection, _hitCollectionName );
+        }
+        
+        if( isFirstEvent() ) 
+        {
+            _isFirstEvent = false;
+        }
 }
 
 void EUTelProcessorHitMaker::end() 
