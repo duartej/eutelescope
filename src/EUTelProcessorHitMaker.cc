@@ -424,9 +424,11 @@ void EUTelProcessorHitMaker::processEvent (LCEvent * event) {
             if ( !_wantLocalCoordinates ) 
             {
                 // 
-                // NOW !!
                 // GLOBAL coordinate system !!!
+                // Note that so far telPos is a local (if we are here),
                 const double localPos[3] = { telPos[0], telPos[1], telPos[2] };
+                // after the return of the local2Master functions, telPos will
+                // contain the coordinates in the Telescope frame
                 geo::gGeometry().local2Master( sensorID, localPos, telPos);
 #if defined(USE_AIDA) || defined(MARLIN_USE_AIDA)
                 if( _histogramSwitch ) 
@@ -435,7 +437,7 @@ void EUTelProcessorHitMaker::processEvent (LCEvent * event) {
                     AIDA::IHistogram2D * histo2D = dynamic_cast<AIDA::IHistogram2D*> (_aidaHistoMap[ tempHistoName ] );
                     if( histo2D )
                     {
-                        histo2D->fill( localPos[0], localPos[1] );
+                        histo2D->fill( telPos[0], telPos[1] );
                     }
                     else 
                     {
