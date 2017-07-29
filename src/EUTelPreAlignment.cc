@@ -182,6 +182,22 @@ void EUTelPreAlign::init()
 	    tempHistoName = "hitYCorr_fixed_to_" + to_string( sensorID) ;
 	    AIDA::IHistogram1D * histo1Db = AIDAProcessor::histogramFactory(this)->createHistogram1D( (basePath + tempHistoName).c_str(), 100 , -10., 10.) ;
 	    _hitYCorr.insert( make_pair( sensorID, histo1Db) );
+	    
+            // 2-dimensional plots using the hits of the reference sensor matched 
+            // with the current plane, note that for microstrips...
+            const double constant=1.2;
+            const double xMin =  -(geo::gGeometry().siPlaneXSize ( sensorID )/2)*constant;
+            const double xMax = ( geo::gGeometry().siPlaneXSize ( sensorID )/2)*constant;   
+
+            const double yMin = -(geo::gGeometry().siPlaneYSize ( sensorID )/2)*constant;
+            const double yMax = (geo::gGeometry().siPlaneYSize ( sensorID )/2)+constant; 
+
+            const int xNBin =    geo::gGeometry().siPlaneXNpixels ( sensorID );
+            const int yNBin =    geo::gGeometry().siPlaneYNpixels ( sensorID );
+            tempHistoName = "2D_hitCorr_fixed_to_" + to_string( sensorID) ;
+	    AIDA::IHistogram2D * histo2Db = AIDAProcessor::histogramFactory(this)->createHistogram2D( 
+                    (basePath + tempHistoName).c_str(), xNBin, xMin, xMax, yNBin, yMin, yMax ) ;
+	    _2dHitHistos.insert( make_pair( sensorID, histo2Db) );
         }
     }
 #endif
@@ -292,6 +308,8 @@ void EUTelPreAlign::processEvent(LCEvent* event)
         
     std::vector<float> residX;
     std::vector<float> residY;
+    std::vector<float> currentX;
+    std::vector<float> currentY;
     std::vector<PreAligner*> prealign;
 
         
@@ -311,6 +329,8 @@ void EUTelPreAlign::processEvent(LCEvent* event)
         const double* refPos = refHit->getPosition();
         residX.clear();
         residY.clear();
+        currentX.clear();
+        currentY.clear();
         prealign.clear();
         
         // loop over all the available hits (but the ones coming from
@@ -358,6 +378,8 @@ void EUTelPreAlign::processEvent(LCEvent* event)
             {
                 residX.push_back( correlationX );
                 residY.push_back( correlationY );
+                currentX.push_back( pos[0] );
+                currentY.push_back( pos[1] );
                 prealign.push_back(&pa);
             }
         }
@@ -376,6 +398,7 @@ void EUTelPreAlign::processEvent(LCEvent* event)
                 {
                     ( dynamic_cast<AIDA::IHistogram1D*> (_hitXCorr[ prealign[ii]->getIden() ] ) )->fill( residX[ii] );
                     ( dynamic_cast<AIDA::IHistogram1D*> (_hitYCorr[ prealign[ii]->getIden() ] ) )->fill( residY[ii] );
+                    ( dynamic_cast<AIDA::IHistogram2D*>(_2dHitHistos[prealign[ii]->getIden()]))->fill(currentX[ii],currentY[ii] );
                 }
 #endif
             }

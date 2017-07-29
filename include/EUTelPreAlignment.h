@@ -211,6 +211,7 @@ namespace eutelescope
 #if defined(USE_AIDA) || defined(MARLIN_USE_AIDA) 
     std::map<unsigned int, AIDA::IBaseHistogram * > _hitXCorr;
     std::map<unsigned int, AIDA::IBaseHistogram * > _hitYCorr;
+    std::map<unsigned int, AIDA::IBaseHistogram * > _2dHitHistos;
 #endif
 
 
