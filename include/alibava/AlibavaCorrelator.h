@@ -151,13 +151,9 @@ namespace alibava
 	protected:
 
 
-		// Hit position X
-		//! Name of the histogram of hit position X
-		std::string _hHitPosX;
-
-		// Hit position Y
-		//! Name of the histogram of hit position Y
-		std::string _hHitPosY;
+		// Hit position 
+		//! Name of the histogram of hit position
+		std::string _hHitPos;
 
 		// Hit correlation in X
 		//! Name of the histogram of hit correlation X
@@ -182,22 +178,21 @@ namespace alibava
 		// number of detectors
 		IntVec _detectorIDs;
 		
-		
 		// just adding "_d" and detector number to the end of string
 		std::string getHistoNameForDetector(std::string name, int detID);
 		
 		// just adding "_d" detID1 and "_d" detID2 to the end of string
 		std::string getHistoNameForDetector(std::string name, int detID1, int detID2);
 
-		// clones TH1D Histogram for each detector
-		void createClones_hHitPos(std::string histoName);
+		// creates TH2F histograms for each detector
+		void createTH2F(const std::string & histoName);
+		
+                // creates TH1F histograms for each detector
+                void createTH1F(const std::string & histoName);
 
-		// clones Correlation Histogram for each detector combination
-		void createClones_hCor(std::string histoName);
-
-		// clones Synchronisation Histogram for each detector combination
-		void createClones_hSync(std::string histoName);
-
+		// creates TH2F histograms for each detector combination
+                void createTH2F_comb(const std::string & histoName,bool isTitleSimple);
+		
 		// checks if detID is in _detectorIDs list
 		bool isInDetectorIDsList(int detID);
 

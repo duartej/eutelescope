@@ -61,12 +61,13 @@ using namespace lcio;
 using namespace marlin;
 using namespace alibava;
 
+// Just a global 
+static CellIDDecoder<TrackerHitImpl> hitDecoder(eutelescope::EUTELESCOPE::HITENCODING);
 
 AlibavaCorrelator::AlibavaCorrelator () :
     AlibavaBaseHistogramMaker("AlibavaCorrelator"),
     // List of Histogram names, initialized here. As an example we put only 2
-    _hHitPosX("hHitPosX"),
-    _hHitPosY("hHitPosY"),
+    _hHitPos("hHitPos"),
     _hCorX("hCorX"),
     _hCorY("hCorY"),
     _hSyncX("hSyncX"),
@@ -204,8 +205,7 @@ std::string AlibavaCorrelator::getHistoNameForDetector(std::string name, int det
 
 void AlibavaCorrelator::fillListOfHistos()
 {
-    addToHistoCheckList(_hHitPosX);
-    addToHistoCheckList(_hHitPosY);
+    addToHistoCheckList(_hHitPos);
     addToHistoCheckList(_hCorX);
     addToHistoCheckList(_hCorY);
     addToHistoCheckList(_hSyncX);
@@ -214,8 +214,31 @@ void AlibavaCorrelator::fillListOfHistos()
     checkListOfHistosCreatedByXMLFile();
 }
 
+// Create TH2F histograms per detector
+void AlibavaCorrelator::createTH2F(const std::string & histoName)
+{
+    AIDAProcessor::tree(this)->cd(this->name());
+    AIDAProcessor::tree(this)->cd(getInputCollectionName().c_str());
+    TH2F * h = dynamic_cast<TH2F*> (_rootObjectMap[histoName]);
+    
+    streamlog_out ( MESSAGE1 )  << "hist "<< histoName<<" "<<h << std::endl;
+    AIDAProcessor::tree(this)->mkdir(histoName.c_str());
+    AIDAProcessor::tree(this)->cd(histoName.c_str());
+    
+    for(unsigned int idet=0; idet<_detectorIDs.size(); idet++) 
+    {
+        int detID = _detectorIDs[idet];
+    	std::string newHistoName = getHistoNameForDetector(histoName, detID);
+	TH2F * hnew = (TH2F*)h->Clone( newHistoName.c_str() );
+
+        std::string title = hnew->GetTitle();
+	title = title + std::string(" (det ") + to_string(detID) + std::string(")");
+	_rootObjectMap.insert(std::make_pair(newHistoName, hnew));
+    }
+}
+
 // XXX Change to createTH1F
-void AlibavaCorrelator::createClones_hHitPos(string histoName)
+void AlibavaCorrelator::createTH1F(const std::string & histoName)
 {
     AIDAProcessor::tree(this)->cd(this->name());
     AIDAProcessor::tree(this)->cd(getInputCollectionName().c_str());
@@ -233,12 +256,14 @@ void AlibavaCorrelator::createClones_hHitPos(string histoName)
 
         std::string title = hnew->GetTitle();
 	title = title + string(" (det ") + to_string(detID) + string(")");
+        //hnew->SetTitle(title.c_str());
+
 	_rootObjectMap.insert(std::make_pair(newHistoName, hnew));
     }
 }
 
 // XXX Change to createTH2F
-void AlibavaCorrelator::createClones_hCor(string histoName)
+void AlibavaCorrelator::createTH2F_comb(const std::string & histoName,bool isTitleSimple)
 {
     AIDAProcessor::tree(this)->cd(this->name());
     AIDAProcessor::tree(this)->cd(getInputCollectionName().c_str());
@@ -257,60 +282,37 @@ void AlibavaCorrelator::createClones_hCor(string histoName)
 	    std::string newHistoName = getHistoNameForDetector(histoName, detID, corDetID);
 	    TH2F * hnew = (TH2F*)h->Clone( newHistoName.c_str() );
 	    std::string title = hnew->GetXaxis()->GetTitle();
-	    title = title + string(" det") + to_string(detID);
+            if(isTitleSimple)
+            {
+                title = title + string(" det") + to_string(detID);
+            }
+            else
+            {
+                title = title + string(" d") + to_string(detID) + string(" - d")+to_string(corDetID);
+            }
+            //hnew->SetTitle(title.c_str());
             
-            title = hnew->GetYaxis()->GetTitle();
-            title = title + string(" det") + to_string(corDetID);
-            
-            _rootObjectMap.insert(make_pair(newHistoName, hnew));
+            _rootObjectMap.insert(std::make_pair(newHistoName, hnew));
         }
     }
 }
 
-// FIXME:: DUPLICATE 
-void AlibavaCorrelator::createClones_hSync(string histoName)
-{
-    AIDAProcessor::tree(this)->cd(this->name());
-    AIDAProcessor::tree(this)->cd(getInputCollectionName().c_str());
-    TH2F * h = dynamic_cast<TH2F*> (_rootObjectMap[histoName]);
-	
-    AIDAProcessor::tree(this)->mkdir(histoName.c_str());
-    AIDAProcessor::tree(this)->cd(histoName.c_str());
-	
-    // the _detectorIDs vector has to be sorted
-    for (unsigned int idet=0; idet<_detectorIDs.size(); idet++) 
-    {
-        int detID = _detectorIDs[idet];
-        for(unsigned int iCorDet=idet+1; iCorDet<_detectorIDs.size(); iCorDet++) 
-        {
-            int corDetID = _detectorIDs[iCorDet]; // correlated detector id
-            string newHistoName = getHistoNameForDetector(histoName, detID, corDetID);
-            TH2F * hnew = (TH2F*)h->Clone( newHistoName.c_str() );
-            string title = hnew->GetYaxis()->GetTitle();
-            title = title + string(" d") + to_string(detID) + string(" - d")+to_string(corDetID);
-            
-            _rootObjectMap.insert(make_pair(newHistoName, hnew));
-        }
-    }
-}
 
 void AlibavaCorrelator::bookHistos()
 {
     // create histograms defined in HistoXMLFile
     processHistoXMLFile();
 
-    // hX plots
-    createClones_hHitPos(_hHitPosX);
-    // hY plots
-    createClones_hHitPos(_hHitPosY);
+    // hit plot
+    createTH2F(_hHitPos);
     // hCorX
-    createClones_hCor(_hCorX);
+    createTH2F_comb(_hCorX,true);
     // hCorY
-    createClones_hCor(_hCorY);
+    createTH2F_comb(_hCorY,true);
     // hSyncX
-    createClones_hSync(_hSyncX);
+    createTH2F_comb(_hSyncX,false);
     // hSyncY
-    createClones_hSync(_hSyncY);
+    createTH2F_comb(_hSyncY,false);
 	
     streamlog_out ( MESSAGE1 )  << "End of Booking histograms. " << std::endl;
 }
@@ -348,13 +350,10 @@ void AlibavaCorrelator::processEvent (LCEvent * anEvent)
     
     /////////////////////////////
     // Now loop ever detectors //
-    CellIDDecoder<TrackerHitImpl> hitDecoder ( eutelescope::EUTELESCOPE::HITENCODING );
     const unsigned int noOfHits = collectionVec->getNumberOfElements();
     
-    //for(const auto &  generic_hit: *collectionVec)
     for(unsigned int ihit=0; ihit < noOfHits; ++ihit)
     {
-        //TrackerHitImpl * ahit = dynamic_cast<TrackerHitImpl*>(generic_hit);
         TrackerHitImpl * ahit = dynamic_cast<TrackerHitImpl*>(collectionVec->getElementAt(ihit));
 	const int detID = hitDecoder(ahit)["sensorID"];
         if( !isInDetectorIDsList(detID) ) 
@@ -363,21 +362,18 @@ void AlibavaCorrelator::processEvent (LCEvent * anEvent)
         }
         
         const double* pos = ahit->getPosition();
-	// fill hX
-	std::string histoName = getHistoNameForDetector(_hHitPosX, detID);
-	TH1F * hX = dynamic_cast<TH1F*> (_rootObjectMap[ histoName ]);
-        hX->Fill(pos[0]);
-        // fill hY
-        histoName = getHistoNameForDetector(_hHitPosY, detID);
-        TH1F * hY = dynamic_cast<TH1F*> (_rootObjectMap[ histoName ]);
-        hY->Fill(pos[1]);
+        // the hit position
+        std::string histoName = getHistoNameForDetector(_hHitPos, detID);
+        TH2F * h  = dynamic_cast<TH2F*>(_rootObjectMap[histoName]);
+        h->Fill(pos[0],pos[1]);
         
-        // correlation plots
+        // correlation plots: (only check hits not previously checked)
 	for(unsigned int i = ihit+1; i < noOfHits; ++i ) 
         {
-            TrackerHitImpl * anotherHit = dynamic_cast< TrackerHitImpl * > ( collectionVec->getElementAt( i ) ) ;
+            TrackerHitImpl * anotherHit = dynamic_cast< TrackerHitImpl * > ( collectionVec->getElementAt( i ) );
             int anotherDetID = hitDecoder( anotherHit )["sensorID"];
-            // only consider hits from other detectors
+            // only consider hits from other detectors (higher than 
+            // the current one) for correlation and synch
             if(detID >= anotherDetID)
             {
                 continue;
