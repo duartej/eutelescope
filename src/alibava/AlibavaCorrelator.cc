@@ -193,14 +193,14 @@ void AlibavaCorrelator::processRunHeader (LCRunHeader * rdr)
     _numberOfSkippedEvents = 0;
 }
 
-std::string AlibavaCorrelator::getHistoNameForDetector(std::string name, int detID)
+std::string AlibavaCorrelator::getHistoNameForDetector(std::string _name, int detID)
 {
-    return std::string(name+"_d"+std::to_string(detID));
+    return std::string(_name+"_d"+std::to_string(detID));
 }
 
-std::string AlibavaCorrelator::getHistoNameForDetector(std::string name, int detID1, int detID2)
+std::string AlibavaCorrelator::getHistoNameForDetector(std::string _name, int detID1, int detID2)
 {
-    return std::string(name+"_d"+std::to_string(detID1)+"_d"+std::to_string(detID2));
+    return std::string(_name+"_d"+std::to_string(detID1)+"_d"+std::to_string(detID2));
 }
 
 void AlibavaCorrelator::fillListOfHistos()
