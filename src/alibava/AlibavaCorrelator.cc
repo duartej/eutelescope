@@ -366,15 +366,16 @@ void AlibavaCorrelator::processEvent (LCEvent * anEvent)
         std::string histoName = getHistoNameForDetector(_hHitPos, detID);
         TH2F * h  = dynamic_cast<TH2F*>(_rootObjectMap[histoName]);
         h->Fill(pos[0],pos[1]);
-        
+
         // correlation plots: (only check hits not previously checked)
 	for(unsigned int i = ihit+1; i < noOfHits; ++i ) 
         {
             TrackerHitImpl * anotherHit = dynamic_cast< TrackerHitImpl * > ( collectionVec->getElementAt( i ) );
             int anotherDetID = hitDecoder( anotherHit )["sensorID"];
             // only consider hits from other detectors (higher than 
-            // the current one) for correlation and synch
-            if(detID >= anotherDetID)
+            // the current one) for correlation and synch, otherwise
+            // they are double-counted
+            if(detID >= anotherDetID || !isInDetectorIDsList(anotherDetID) ) 
             {
                 continue;
             }
