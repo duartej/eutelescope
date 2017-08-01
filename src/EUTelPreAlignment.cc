@@ -194,7 +194,7 @@ void EUTelPreAlign::init()
 
             const int xNBin =    geo::gGeometry().siPlaneXNpixels ( sensorID );
             const int yNBin =    geo::gGeometry().siPlaneYNpixels ( sensorID );
-            tempHistoName = "2D_hitCorr_fixed_to_" + to_string( sensorID) ;
+            tempHistoName = "H2D_hitCorr_fixed_to_" + to_string( sensorID) ;
 	    AIDA::IHistogram2D * histo2Db = AIDAProcessor::histogramFactory(this)->createHistogram2D( 
                     (basePath + tempHistoName).c_str(), xNBin, xMin, xMax, yNBin, yMin, yMax ) ;
 	    _2dHitHistos.insert( make_pair( sensorID, histo2Db) );
