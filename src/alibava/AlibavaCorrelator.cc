@@ -128,6 +128,9 @@ void AlibavaCorrelator::init ()
     // if you want to change any variable defined in HistoXMLFile use this function
     // see example function below
     createRulesToChangeXMLValues();
+    
+    // reads and creates the histograms defined in HistoXMLFile
+    bookHistos();    
 }
 
 void AlibavaCorrelator::createRulesToChangeXMLValues()
@@ -186,9 +189,6 @@ void AlibavaCorrelator::processRunHeader (LCRunHeader * rdr)
     _totalNumberOfEvents = arunHeader->getNoOfEvents();
     streamlog_out ( DEBUG1 ) << "N events "<<_totalNumberOfEvents << endl;
 
-    // reads and creates the histograms defined in HistoXMLFile
-    bookHistos();
-    
     // set number of skipped events to zero (defined in AlibavaBaseProcessor)
     _numberOfSkippedEvents = 0;
 }
