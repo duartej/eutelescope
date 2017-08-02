@@ -288,7 +288,7 @@ void EUTelApplyAlignmentProcessor::CheckIOCollections(LCEvent* event)
             }   
             catch(...)
             {
-              if(_iEvt%1000 == 0) streamlog_out ( WARNING2 ) <<  "_referenceHitCollectionName " << _referenceHitCollectionName.c_str() << " could not be retrieved, creating a dummy one (all elements are null) " << endl;
+              if(_iEvt%1000 == 0) streamlog_out ( DEBUG5 ) <<  "_referenceHitCollectionName " << _referenceHitCollectionName.c_str() << " could not be retrieved, creating a dummy one (all elements are null) but it will be updated with the prea-align database probably  " << endl;
              
               _referenceHitVec = CreateDummyReferenceHitCollection();
               event->addCollection( _referenceHitVec, _referenceHitCollectionName );
