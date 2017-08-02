@@ -1457,7 +1457,7 @@ void EUTelMille::processEvent (LCEvent * event) {
     streamlog_out ( MESSAGE1 ) << endl;
   }
 
-  streamlog_out ( MESSAGE1 ) << "Number of track candidates found: " << _iEvt << ": " << _nTracks << endl;
+  streamlog_out ( MESSAGE1 ) << "Number of track candidates found at: " << _iEvt << ": " << _nTracks << endl;
 
   // Perform fit for all found track candidates
   // ------------------------------------------
