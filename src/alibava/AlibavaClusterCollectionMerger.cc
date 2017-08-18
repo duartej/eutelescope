@@ -58,22 +58,22 @@ using namespace eutelescope;
 AlibavaClusterCollectionMerger::AlibavaClusterCollectionMerger ():
     DataSourceProcessor("AlibavaClusterCollectionMerger"),
     //telescope
-    //_telescope_lcReader(),
     _telescopeFileName(ALIBAVA::NOTSET),
     _telescopePulseCollectionName(ALIBAVA::NOTSET),
     _telescopeSparseCollectionName(ALIBAVA::NOTSET),
     // alibava
-    //_alibava_lcReader(),
     _alibavaFileName(ALIBAVA::NOTSET),
+    _alibavaReferenceFileName(ALIBAVA::NOTSET),
     _alibavaPulseCollectionName(ALIBAVA::NOTSET),
     _alibavaSparseCollectionName(ALIBAVA::NOTSET),
     // output
     _outputPulseCollectionName(ALIBAVA::NOTSET),
-    _outputSparseCollectionName(ALIBAVA::NOTSET)
+    _outputSparseCollectionName(ALIBAVA::NOTSET),
+    _refSensorID(-1)
 {
     // initialize few variables
 	
-    _description = "Merges alibava and telescope cluster collections";
+    _description = "Merges alibava (both DUT and Reference if present) and telescope cluster collections";
     ///////////////
     // Telescope //
     ///////////////
@@ -98,7 +98,12 @@ AlibavaClusterCollectionMerger::AlibavaClusterCollectionMerger ():
     // file name
     registerProcessorParameter("InputAlibavaFileName", 
             "This is the input file name that alibava cluster collections stored",
-            _alibavaFileName, string("runXXXXXX.slcio") );
+            _alibavaFileName, std::string("runXXXXXX.slcio") );
+    
+    registerProcessorParameter("InputAlibavaReferenceFileName", 
+            "This is the input file name for the alibava used as reference sensor and the "\
+            "cluster collections are stored. If the string is empty, will act as there is no reference sensor",
+            _alibavaReferenceFileName, std::string("") );
     
     // pulse collection
     registerInputCollection(LCIO::TRACKERPULSE, "AlibavaClusterPulseCollectionName",
@@ -135,6 +140,40 @@ AlibavaClusterCollectionMerger * AlibavaClusterCollectionMerger::newProcessor ()
 void AlibavaClusterCollectionMerger::init () 
 {
     printParameters ();
+
+    // Whether a reference alibava should be used
+    if(_alibavaReferenceFileName == "")
+    {
+        _checkAlibavaReferenceEvent = [] (LCReader* /* noop */, AlibavaEventImpl* /* noop*/) -> bool { return nullptr; };
+        _refPresent = false;
+    }
+    else
+    {
+        _checkAlibavaReferenceEvent = [] (LCReader* reader, AlibavaEventImpl* & updatedEvt) -> bool 
+                { 
+                   updatedEvt = static_cast<AlibavaEventImpl*>(reader->readNextEvent()); 
+                   if(updatedEvt == nullptr ) return false;
+                   else return true;
+                };
+        _refPresent = true;
+        // List the available sensor IDs for the telescope and DUT alibava
+        getSensorID = [this] (const int & id) -> int
+            {
+                this->_usedSensorIDs.insert(id);
+                return id;
+            };
+        // To be used initialy, afterwards, it will call just the datamember
+        this->getReferenceSensorID = [this] () -> int 
+            {
+                if(this->_refSensorID==-1)
+                {
+                    _refSensorID = *(_usedSensorIDs.rbegin())+1;
+                    // Update function to return the update value
+                    this->getSensorID = [](const int & id) { return id; };
+                }
+                return _refSensorID;
+            };
+    }    
 }
 
 void AlibavaClusterCollectionMerger::readDataSource(int /* numEvents */) 
@@ -160,9 +199,21 @@ void AlibavaClusterCollectionMerger::readDataSource(int /* numEvents */)
         {
             streamlog_out ( ERROR1 ) << "Can't open the alibava file: " << e.what() << std::endl ;
         }
-	
-	
-	// we will copy alibava run header to as the header of output file.
+	// open alibava reference file, if provided
+	LCReader* alibavaRef_lcReader = LCFactory::getInstance()->createLCReader();
+        if(_refPresent)
+        {
+            try
+            {
+                alibavaRef_lcReader->open( _alibavaReferenceFileName );
+            }
+            catch( IOException& e )
+            {
+                streamlog_out ( ERROR1 ) << "Can't open the alibava file: " << e.what() << std::endl ;
+            }
+        }
+
+	// we will copy alibava run header to as the header of output file (use the DUT).
 	try
         {
             LCRunHeader* alibava_runHeader = alibava_lcReader->readNextRunHeader();
@@ -177,6 +228,7 @@ void AlibavaClusterCollectionMerger::readDataSource(int /* numEvents */)
 	int eventCounter=0;
 	EUTelEventImpl*  telescopeEvent=nullptr;
 	AlibavaEventImpl* alibavaEvent=nullptr;
+	AlibavaEventImpl* alibavaRefEvent=nullptr;
 	if(_eventIDDiff<0 )
         {
             for (int i=0; i<abs(_eventIDDiff); i++)
@@ -188,7 +240,11 @@ void AlibavaClusterCollectionMerger::readDataSource(int /* numEvents */)
         {
             for(int i=0; i<_eventIDDiff; i++)
             {
-                alibavaEvent = static_cast<AlibavaEventImpl*> ( alibava_lcReader->readNextEvent() );
+                alibavaEvent    = static_cast<AlibavaEventImpl*> ( alibava_lcReader->readNextEvent() );
+                if(_refPresent)
+                {
+                    alibavaRefEvent = static_cast<AlibavaEventImpl*>(alibavaRef_lcReader->readNextEvent());
+                }
             }
 	}
 	
@@ -196,7 +252,8 @@ void AlibavaClusterCollectionMerger::readDataSource(int /* numEvents */)
         //       collections, the threw exception is not going to be seen...
 	bool noCollectionFound = false;
 	while( ((telescopeEvent = static_cast<EUTelEventImpl*> ( telescope_lcReader->readNextEvent())) != 0 ) 
-                && ((alibavaEvent = static_cast<AlibavaEventImpl*> (alibava_lcReader->readNextEvent())) != 0 ) )
+                && ((alibavaEvent = static_cast<AlibavaEventImpl*> (alibava_lcReader->readNextEvent())) != 0 )
+                && _checkAlibavaReferenceEvent(alibavaRef_lcReader,alibavaRefEvent) )
 	{
             noCollectionFound = false;
             if(telescopeEvent->getEventType() == kEORE)
@@ -220,9 +277,28 @@ void AlibavaClusterCollectionMerger::readDataSource(int /* numEvents */)
             catch ( DataNotAvailableException& e ) 
             {
                 noCollectionFound = true;
-                streamlog_out( WARNING5 ) <<"No input collection " 
+                streamlog_out( WARNING5 ) <<"[DUT Alibava]: No input collection " 
                     << _alibavaPulseCollectionName << " or "<< _alibavaSparseCollectionName 
                     << " found on alibava event " << alibavaEvent->getEventNumber() << std::endl;
+            }
+            
+            LCCollectionVec * alibavaRefPulseColVec = nullptr;
+            LCCollectionVec * alibavaRefSparseColVec = nullptr;
+            if(_refPresent)
+            {
+                try
+                {
+                    // get alibava collections
+                    alibavaRefPulseColVec = dynamic_cast<LCCollectionVec*>( alibavaRefEvent->getCollection( _alibavaPulseCollectionName ) ) ;
+                    alibavaRefSparseColVec = dynamic_cast<LCCollectionVec*>( alibavaRefEvent->getCollection( _alibavaSparseCollectionName ) ) ;
+                }
+                catch (DataNotAvailableException& e ) 
+                {
+                    noCollectionFound = true;
+                    streamlog_out( WARNING5 ) <<"[Reference Alibava]: No input collection " 
+                        << _alibavaPulseCollectionName << " or "<< _alibavaSparseCollectionName 
+                        << " found on alibava event " << alibavaEvent->getEventNumber() << std::endl;
+                }
             }
 			
             LCCollectionVec * telescopePulseColVec = nullptr;
@@ -251,6 +327,11 @@ void AlibavaClusterCollectionMerger::readDataSource(int /* numEvents */)
 		copyClustersInCollection(outputPulseColVec, outputSparseColVec, telescopePulseColVec, telescopeSparseColVec);
                 // copy alibava cluster
                 copyClustersInCollection(outputPulseColVec, outputSparseColVec, alibavaPulseColVec, alibavaSparseColVec);
+                // copy alibava Ref cluster
+                if(_refPresent)
+                {
+                    copyClustersInCollection(outputPulseColVec, outputSparseColVec, alibavaRefPulseColVec, alibavaRefSparseColVec,true);
+                }
             }
             
             try
@@ -298,7 +379,8 @@ void AlibavaClusterCollectionMerger::readDataSource(int /* numEvents */)
 
 void AlibavaClusterCollectionMerger::copyClustersInCollection(LCCollectionVec * outputPulseColVec, 
         LCCollectionVec * outputSparseColVec, LCCollectionVec * inputPulseColVec, 
-        LCCollectionVec * inputSparseColVec)
+        LCCollectionVec * inputSparseColVec,
+        bool isReferenceSensor)
 {
     // Here is the Cell ID Encodes for pulseFrame and sparseFrame
     // CellID Encodes are introduced in eutelescope::EUTELESCOPE
@@ -322,8 +404,16 @@ void AlibavaClusterCollectionMerger::copyClustersInCollection(LCCollectionVec * 
         TrackerPulseImpl* inputPulseFrame = dynamic_cast<TrackerPulseImpl*>(inputPulseColVec->getElementAt(i));
         TrackerDataImpl* inputSparseFrame = dynamic_cast<TrackerDataImpl*>(inputPulseFrame->getTrackerData());
         
+        // Note the reference sensor has to be calling this function the last one, 
+        // in that case, all the sensors IDs have been used, so first time is 
+        // going to obtain the lowest ID number available to be used
+        int sensorID = this->getSensorID(static_cast<int>(inputSparseColDecoder(inputSparseFrame)["sensorID"]));
+        if(isReferenceSensor)
+        {
+            sensorID = this->getReferenceSensorID();
+        }
         // set Cell ID for sparse collection
-        outputSparseColEncoder["sensorID"] = static_cast<int>(inputSparseColDecoder(inputSparseFrame) ["sensorID"]);
+        outputSparseColEncoder["sensorID"] = sensorID;
 	outputSparseColEncoder["sparsePixelType"] =static_cast<int>(inputSparseColDecoder(inputSparseFrame)["sparsePixelType"]);
 	outputSparseColEncoder["quality"] = static_cast<int>(inputSparseColDecoder(inputSparseFrame)["quality"]);
 	outputSparseColEncoder.setCellID( outputSparseFrame );
@@ -333,8 +423,9 @@ void AlibavaClusterCollectionMerger::copyClustersInCollection(LCCollectionVec * 
 	// add it to the cluster collection
 	outputSparseColVec->push_back( outputSparseFrame );
 		
-	// prepare a pulse for this cluster
-	outputPulseColEncoder["sensorID"] = static_cast<int> (inputPulseColDecoder(inputPulseFrame) ["sensorID"]);
+	// prepare a pulse for this cluster 
+        // (should be same sensor ID, right?)
+        outputPulseColEncoder["sensorID"] = sensorID; //static_cast<int> (inputPulseColDecoder(inputPulseFrame) ["sensorID"]);
 	outputPulseColEncoder["type"] = static_cast<int>(inputPulseColDecoder(inputPulseFrame) ["type"]);
 	outputPulseColEncoder.setCellID( outputPulseFrame );
 		
