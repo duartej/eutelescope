@@ -69,7 +69,14 @@ AlibavaClusterCollectionMerger::AlibavaClusterCollectionMerger ():
     // output
     _outputPulseCollectionName(ALIBAVA::NOTSET),
     _outputSparseCollectionName(ALIBAVA::NOTSET),
-    _refSensorID(-1)
+    _eventIDDiff(-1),
+    _usedSensorIDs(),
+    _refPresent(false),
+    _refSensorID(-1),
+    getReferenceSensorID(nullptr),
+    getSensorID(nullptr),
+    _checkAlibavaReferenceEvent(nullptr)
+
 {
     // initialize few variables
 	
