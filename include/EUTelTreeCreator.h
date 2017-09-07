@@ -85,9 +85,10 @@ namespace eutelescope
             TTree * _tree;
 
             // The auxiliary map for the tree filling
-            std::map<std::string,std::vector<float>*> _branches;
             std::map<std::string,std::vector<int>*> _branches_I;
+            std::map<std::string,std::vector<float>*> _branches;
             std::map<std::string,int> _branches_int;
+            std::map<std::string,float> _branches_float;
 
             int _iRun;
             int _iEvt;
