@@ -30,7 +30,6 @@ namespace alibava
         private:
             std::vector<int> _channums;
             std::vector<float> _signals;
-            std::vector<float> _signals;
             float _eta;
             int _chipNum;
             int _seedChanNum;
