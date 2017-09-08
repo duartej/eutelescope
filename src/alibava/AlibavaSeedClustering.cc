@@ -361,7 +361,7 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
         ++clusterID;
 		
 	// add seed channel to the cluster
-        acluster.add(seedChan, dataVec[seedChan]);
+        acluster.add(seedChan, dataVec[seedChan], noiseVec[seedChan]);
         // mask seed channel so no other cluster can use it!
         channel_can_be_used[seedChan]=false;
         
@@ -395,7 +395,7 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
                 // And the channel if possible
                 if(channel_can_be_used[ichan])
                 {
-                    acluster.add(ichan, dataVec[ichan]);
+                    acluster.add(ichan, dataVec[ichan], noiseVec[ichan]);
                     // and mask it so that it will not be added to any other cluster
                     channel_can_be_used[ichan]=false;
                 }

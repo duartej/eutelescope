@@ -28,9 +28,12 @@ namespace alibava
     class AlibavaCluster 
     {
         private:
+            // The channel number of the strip composing the cluster
             std::vector<int> _channums;
+            // The evaluated signal for each channel
             std::vector<float> _signals;
-            std::vector<float> _signals;
+            // The noise corresponding to each channel
+            std::vector<float> _noise;
             float _eta;
             int _chipNum;
             int _seedChanNum;
@@ -43,16 +46,28 @@ namespace alibava
             AlibavaCluster(lcio::TrackerDataImpl* trkdata);
             ~AlibavaCluster();
 
+            // Get the channel number correponding to the 
+            // imember-strip of the cluster
 	    int getChanNum(int imember);
+            // Get the signal corresponding to the i-strip of the cluster
 	    float getSignal(int imember);
-            // Overload function to obtain the signal in electrons
+            // Overload function to obtain the signal in electrons for a given strip
             float getSignal(const int & imember,const std::vector<float> calibration);
+            // Get the total signal of the cluster
 	    float getTotalSignal();
-            // Overload function to obtain the signal in electrons
+            // Overload function to obtain the signal of the cluster in electrons
 	    float getTotalSignal(const std::vector<float> calibration);
+            // Get the noise of a given cluster
+            float getNoise(int imember);
+            // Get the total noise of the cluster
+            float getNoise();
+            // Get the signal to noise ratio 
 	    float getTotalSNR(EVENT::FloatVec noiseVec);
-	    
-	    void add(int achannum, float asignal);
+            // Get the signal to noise ratio 
+            float getTotalSNR();
+
+	    // Add a strip to be part of the cluster
+	    void add(int achannum, float asignal, float noise);
 	    int getClusterSize();
 	    bool has_seed();
 	    void print();
@@ -67,10 +82,6 @@ namespace alibava
 	    
 	    void createTrackerData(lcio::TrackerDataImpl * alibavaCluster);
 	    
-	    ///////////////////////
-	    // Setters - Getters //
-	    ///////////////////////
-            
             // The eta is calculated using only the strips
             // belonging to the cluster
             float getEtaFromCluster();
@@ -98,16 +109,6 @@ namespace alibava
 	    // setter / getter for _signalPolarity
 	    int getSignalPolarity();
 	    void setSignalPolarity(int signalPolarity);
-
-/*
-	    // setter / getter for _sensorIDOffset
-	    int getSensorIDOffset();
-	    void setSensorIDOffset(int sensorIDOffset);
-	    
-	    // setter / getter for _missingCorrdinateValue
-	    int getMissingCorrdinateValue();
-	    void setMissingCorrdinateValue(int missingCorrdinateValue);
-*/
 	};
 	
 } // end of alibava namespace
