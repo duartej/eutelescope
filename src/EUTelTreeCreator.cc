@@ -413,6 +413,8 @@ void EUTelTreeCreator::processEvent (LCEvent * event)
         // The total Charge, noise and SNR
         auto rcluster = Utility::GetClusterFromHit(dutHit);
         _branches["hit_total_charge"]->push_back(rcluster->getTotalCharge());
+        //_branches["hit_total_noise"]->push_back(rcluster->getClusterNoise());
+        //_branches["hit_cluster_SNR"]->push_back(rcluster->getClusterSNR());
         rcluster.reset(nullptr);
 
         // And the number of pixels
@@ -423,14 +425,6 @@ void EUTelTreeCreator::processEvent (LCEvent * event)
             // Note that the TrackDataImpl::getChargeValues() function returns a vector which
             // contains 
             _branches_I["hit_Ncluster"]->push_back(static_cast<TrackerDataImpl*>(rawhits[0])->getChargeValues().size()/4);
-            // -- XXX Implemented in the AlibavaCluster the noise storage inside the
-            //        TrackerDataImpl vector, The vector is stored as :
-            //        [Eta of the cluster, channel_number, signal[channel_number], noise[channel_number], ...
-            //        and for each channel you find 3-elements
-            //for(-- rawhits ?)
-            //{ get all ---- CHECK HOW TO DO IT
-            //_branches["hit_total_noise"]->push_back(rcluster->getClusterNoise());
-            //_branches["hit_cluster_SNR"]->push_back(rcluster->getClusterSNR());
         }
         else
         {

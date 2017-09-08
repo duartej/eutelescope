@@ -81,13 +81,13 @@ AlibavaCluster::AlibavaCluster(TrackerDataImpl* trkdata) :
 	
     EVENT::FloatVec data = trkdata->getChargeValues();
     // first number is eta,
-    // then it goes like channel number, signal, noise // see createTrackerData
-    // So data size has to be multiple of 3 (minus the eta)!
-    if((data.size()-1) % 3 != 0)
+    // then it goes like channel number, signal // see createTrackerData
+    // So data size has to be odd! (because of eta)
+    if(data.size() % 2 != 1)
     {
         streamlog_out (ERROR5) << "Size in TrackerData that stores " 
-            << "cluster information is 3-multiple! Either channel number, " 
-            << " signal or noise information is missing!"<< std::endl;
+            << "cluster information is not even! Either channel number " 
+            << " or signal information is missing!"<< std::endl;
     }
     // first number is eta, others are channel number and corresponding signal
     this->setEta(data.at(0));
@@ -96,8 +96,6 @@ AlibavaCluster::AlibavaCluster(TrackerDataImpl* trkdata) :
         _channums.push_back( int(data[imember]) );
         ++imember;
         _signals.push_back( data[imember] );
-        ++imember;
-        _noise.push_back( data[imember] );
     }
 }
 
@@ -113,12 +111,11 @@ void AlibavaCluster::createTrackerData(lcio::TrackerDataImpl * alibavaCluster)
 	
     // first store eta
     dataToStore.push_back(getEta());
-    // then channel number, signal and noise for each member
+    // then channel number and signal for each member
     for(int imember=0; imember<getClusterSize(); imember++) 
     {
         dataToStore.push_back( float(getChanNum(imember)) );
         dataToStore.push_back( getSignal(imember) );
-        dataToStore.push_back( getNoise(imember) );
     }
     alibavaCluster->setChargeValues(dataToStore);
     // Cell ID encoding will done in the main processor	
@@ -337,26 +334,6 @@ float AlibavaCluster::getSignal(const int & imember, const std::vector<float> ca
     return _signals[imember]*calv[imember];
 }
 
-float AlibavaCluster::getNoise(int imember)
-{
-    if(imember >= getClusterSize())
-    {
-        streamlog_out(ERROR5)<< "Not enough members in this AlibavaCluster"<<std::endl;
-        return 0;
-    }
-    return _noise[imember];
-}
-
-float AlibavaCluster::getNoise()
-{
-    float totalnoise=0;
-    for(int imember=0; imember<getClusterSize(); imember++)
-    {
-        totalnoise += _noise[imember];
-    }
-    return totalnoise;
-}
-
 float AlibavaCluster::getTotalSNR(FloatVec noiseVec) 
 {
     float snr_total = 0;
@@ -371,11 +348,6 @@ float AlibavaCluster::getTotalSNR(FloatVec noiseVec)
 	snr_total += getSignal(imember)/noiseVec[channel];
     }
     return snr_total * getSignalPolarity();
-}
-
-float AlibavaCluster::getTotalSNR()
-{
-    return this->getTotalSNR(this->_noise);
 }
 
 float AlibavaCluster::getTotalSignal() 
@@ -406,11 +378,10 @@ float AlibavaCluster::getTotalSignal(const std::vector<float> calv)
     return totalsignal;
 }
 
-void AlibavaCluster::add(int achannum, float asignal,float noise)
+void AlibavaCluster::add(int achannum, float asignal)
 {
     _channums.push_back(achannum);
     _signals.push_back(asignal);
-    _noise.push_back(noise);
 }
 
 int AlibavaCluster::getClusterSize()
