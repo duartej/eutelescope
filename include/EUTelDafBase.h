@@ -144,7 +144,12 @@ namespace eutelescope {
     void getPlaneNorm(daffitter::FitPlane<float>& pl);
 
     daffitter::TrackerSystem<float,4> _system;
+    // A z-position is linked with the position of the sensor as it is stored
+    // in the input gear file
     std::map<float, int> _zSort;
+    // A sensor ID is linked with the index number (as it was stored in the 
+    // system, i.e. ordered by z-position) (Note that this number is not 
+    // exactly the same int in the _zSort map)
     std::map<int, int> _indexIDMap;
     std::vector<float> _radLength;
     std::vector<float> _sigmaX, _sigmaY;

@@ -164,6 +164,7 @@ EUTelDafBase::EUTelDafBase(std::string name) : marlin::Processor(name) {
 bool EUTelDafBase::defineSystemFromData(){
   //Find three measurements per plane, use these three to define the plane as a point and a normal vector
   bool gotIt = true;
+
   for(size_t plane = 0; plane < _system.planes.size(); plane++){
     daffitter::FitPlane<float>& pl = _system.planes.at(plane);
     bool gotPlane = false;
@@ -173,37 +174,78 @@ bool EUTelDafBase::defineSystemFromData(){
 	find(_dutPlanes.begin(), _dutPlanes.end(), pl.getSensorID()) == _dutPlanes.end()){
       continue;
     }
-    
-    for(size_t meas = 0; meas < pl.meas.size(); meas++){
-      if( _nRef.at(plane) > 2){ gotPlane = true; continue; }
-      if( _nRef.at(plane) == 0 ){
-	pl.setRef0( Eigen::Matrix<float, 3, 1>(pl.meas.at(meas).getX(), pl.meas.at(meas).getY(), pl.meas.at(meas).getZ()));
-	_nRef.at(plane)++;
-	gotPlane = false;
-	continue;
-      }
 
-      if( fabs(pl.meas.at(meas).getX() - pl.getRef0()(0) ) < 500) { continue; }
-      if( fabs(pl.meas.at(meas).getY() - pl.getRef0()(1) ) < 500) { continue; }
-
-      if( _nRef.at(plane) == 1 ){
-	pl.setRef1( Eigen::Matrix<float, 3, 1>(pl.meas.at(meas).getX(), pl.meas.at(meas).getY(), pl.meas.at(meas).getZ()));
-	_nRef.at(plane)++;
-	gotPlane = false;
-	continue;
-      }
-      if( fabs(pl.meas.at(meas).getX() - pl.getRef1()(0) ) < 500) {  continue; }
-      if( fabs(pl.meas.at(meas).getY() - pl.getRef1()(1) ) < 500) {  continue; }
-      if( _nRef.at(plane) == 2 ){
-	pl.setRef2( Eigen::Matrix<float, 3, 1>(pl.meas.at(meas).getX(), pl.meas.at(meas).getY(), pl.meas.at(meas).getZ()));
-	_nRef.at(plane)++;
+    // [JDC] GUARD to check the possibility of not having measured hits in a plane. This
+    //       possibility appears when using DUTs acquired with different DAQ than the telescope
+    //       and then merged in the same event (for instance ALiVaBa). In particular a DUT using
+    //       a DAQ triggered by event could       contain very few hits (if any)
+    if(pl.meas.size() < 5)
+    {
+        // Building the 3-points to define the plane. Note as we don't have 
+        pl.setRef0( Eigen::Matrix<float,3,1>(0.0, 0.0, pl.getZpos()) ); 
+        pl.setRef1( Eigen::Matrix<float,3,1>(0.0, 1.0, pl.getZpos()) ); 
+        pl.setRef2( Eigen::Matrix<float,3,1>(1.0, 0.0, pl.getZpos()) ); 
+	_nRef.at(plane) = 3;
 	getPlaneNorm(pl);
-	streamlog_out ( MESSAGE5 ) << "Initialized plane " << pl.getSensorID() << endl;
+	streamlog_out ( MESSAGE5 ) << "Initialized plane " << pl.getSensorID() << std::endl;
 	gotPlane = true;
-	continue;
-      }
     }
-    if(not gotPlane) { gotIt = false;}
+    else
+    {
+        for(size_t meas = 0; meas < pl.meas.size(); meas++)
+        {
+            if( _nRef.at(plane) > 2)
+            { 
+                gotPlane = true; continue; 
+            }
+            if( _nRef.at(plane) == 0 )
+            {
+                pl.setRef0( Eigen::Matrix<float, 3, 1>(pl.meas.at(meas).getX(), pl.meas.at(meas).getY(), pl.meas.at(meas).getZ()));
+                _nRef.at(plane)++;
+                gotPlane = false;
+                continue;
+            }
+            if( fabs(pl.meas.at(meas).getX() - pl.getRef0()(0) ) < 500) 
+            {
+                continue; 
+            }
+            if( fabs(pl.meas.at(meas).getY() - pl.getRef0()(1) ) < 500) 
+            {
+                continue; 
+            }
+
+            if( _nRef.at(plane) == 1 )
+            {
+                pl.setRef1( Eigen::Matrix<float, 3, 1>(pl.meas.at(meas).getX(), pl.meas.at(meas).getY(), pl.meas.at(meas).getZ()));
+                _nRef.at(plane)++;
+                gotPlane = false;
+                continue;
+            }
+            if( fabs(pl.meas.at(meas).getX() - pl.getRef1()(0) ) < 500) 
+            {
+                continue; 
+            } 
+            if( fabs(pl.meas.at(meas).getY() - pl.getRef1()(1) ) < 500) 
+            {  
+                continue; 
+            }
+
+            if( _nRef.at(plane) == 2 )
+            {
+                pl.setRef2( Eigen::Matrix<float, 3, 1>(pl.meas.at(meas).getX(), pl.meas.at(meas).getY(), pl.meas.at(meas).getZ()));
+                _nRef.at(plane)++;
+                getPlaneNorm(pl);
+                streamlog_out ( MESSAGE5 ) << "Initialized plane " << pl.getSensorID() << endl;
+                gotPlane = true;
+                continue;
+            }
+        }
+
+        if(not gotPlane) 
+        { 
+            gotIt = false;
+        }
+    }
   }
   return(gotIt);
 }
@@ -341,17 +383,21 @@ void EUTelDafBase::init() {
   _zSort.clear();
   for(int plane = 0; plane < _siPlanesLayerLayout->getNLayers(); plane++){
     _zSort[ _siPlanesLayerLayout->getLayerPositionZ(plane) * 1000.0 ] = plane;
-    _indexIDMap[ _siPlanesLayerLayout->getID( plane )] = plane;
+    // --> [JDC] Below line is only adecuated if the planes have the same order in Z
+    //           than their IDs, otherwise it is not true anymore 
+    //           See that the "plane" variable is following the same order that it is 
+    //           found the planes in the gear file 
+    //_indexIDMap[ _siPlanesLayerLayout->getID( plane )] = plane;
   }
 
   //Add Planes to tracker system,
-  map<float, int>::iterator zit = _zSort.begin();
+  std::map<float, int>::iterator zit = _zSort.begin();
   size_t index(0), nActive(0);
   for( ; zit != _zSort.end(); index++, zit++){
     _nRef.push_back(3);
-    int sensorID = _siPlanesLayerLayout->getID( (*zit).second );
+    const int sensorID = _siPlanesLayerLayout->getID( (*zit).second );
     //Read sensitive as 0, in case the two are different
-    float zPos  = _siPlanesLayerLayout->getSensitivePositionZ( (*zit).second )* 1000.0;
+    const float zPos  = _siPlanesLayerLayout->getSensitivePositionZ( (*zit).second )* 1000.0;
     //+ 0.5 * 1000.0 *  _siPlanesLayerLayout->getSensitiveThickness( (*zit).second) ; // Do not move plane to center of plane, use front.
     //Figure out what kind of plane we are dealing with
     float errX(0.0f), errY(0.0f);
@@ -393,6 +439,8 @@ void EUTelDafBase::init() {
     if(not excluded){ nActive++;}
     _system.addPlane(sensorID, zPos , errX, errY, scatter, excluded);
     gearRotate(index, (*zit).second);
+    // And keep track of the order introduced in the _system
+    _indexIDMap[sensorID] = index;
   }
  
   //Prepare track finder
