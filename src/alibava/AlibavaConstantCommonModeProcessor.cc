@@ -236,7 +236,7 @@ void AlibavaConstantCommonModeProcessor::processEvent(LCEvent * anEvent)
         TrackerDataImpl * trkdata = dynamic_cast<TrackerDataImpl*>(collectionVec->getElementAt(i));
         const int chipnum = getChipNum(trkdata);
         // Find Commonmode and its error (i.e. the common noise)
-        auto commonModePair = this->calculateConstantCommonMode(trkdata->getChargeValues(),getChipNum(trkdata));
+        auto commonModePair = this->calculateConstantCommonMode(trkdata->getChargeValues(),chipnum);
         // And store it
     	TrackerDataImpl * commonData = new TrackerDataImpl();
     	commonData->setChargeValues(commonModePair.first);

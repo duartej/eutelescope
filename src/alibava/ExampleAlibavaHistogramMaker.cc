@@ -346,7 +346,7 @@ void ExampleAlibavaHistogramMaker::processEvent (LCEvent * anEvent) {
 	/////////////////////////////
 	// Now loop ever detectors //
 	LCCollectionVec * collectionVec;
-	unsigned int noOfChip;
+	unsigned int noOfChip(0);
 	try{
 		collectionVec = dynamic_cast< LCCollectionVec * > ( alibavaEvent->getCollection( getInputCollectionName() ) ) ;
 		noOfChip = collectionVec->getNumberOfElements();
