@@ -221,20 +221,32 @@ void AlibavaSeedClustering::processEvent (LCEvent * anEvent)
     // cell id encode for AlibavaCluster
     CellIDEncoder<TrackerDataImpl> clusterIDEncoder(ALIBAVA::ALIBAVACLUSTER_ENCODE,clusterColVec);
     	
-    const unsigned int noOfChip = inputColVec->getNumberOfElements();
-    for(unsigned int i = 0; i < noOfChip; ++i )
+    // Cross-check
+    if( inputColVec->getNumberOfElements() != static_cast<int>(this->getChipSelection().size()) )
     {
+        streamlog_out(ERROR) << "Inconsistency in the Input Collection '" << 
+            getInputCollectionName() << "'. Must contain the same number of elements than " 
+            << " chips evaluated (currently " << this->getChipSelection().size() << std::endl;
+        return;
+    }
+
+    for(int i = 0; i < inputColVec->getNumberOfElements(); ++i)
+    {
+        // Note that the i-index is referring to the input col element (which is related with 
+        // the chip number but is not exactly that. The collection elements must follow the same 
+        // chip order stored in the getChipSelection
+        const int noOfChip = this->getChipSelection()[i];
+
         // get the data from the collection 
         TrackerDataImpl * trkdata = dynamic_cast<TrackerDataImpl*>(inputColVec->getElementAt(i));
         // Get the clusters of hits (see findClusters function)
         std::vector<AlibavaCluster> clusters = this->findClusters(trkdata);
-        
         // The number of clusters per event histogram
-        TH1I * h = dynamic_cast<TH1I*>(_rootObjectMap[getHistoNameForChip(_clusterSizePerEvtHistoName,i)]);
+        TH1I * h = dynamic_cast<TH1I*>(_rootObjectMap[getHistoNameForChip(_clusterSizePerEvtHistoName,noOfChip)]);
         h->Fill(clusters.size());
 
         // The cluster charge per tdc time
-        TH2F * hClusterSignalvsTime = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_clusterChargePerTDCTimeHistoName,i)]);
+        TH2F * hClusterSignalvsTime = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_clusterChargePerTDCTimeHistoName,noOfChip)]);
         // loop over clusters
         for(auto acluster: clusters) 
         {
@@ -512,8 +524,7 @@ void AlibavaSeedClustering::bookHistos()
 {
     AIDAProcessor::tree(this)->cd(this->name());
     
-    EVENT::IntVec chipSelection = getChipSelection();
-    for(const auto & ichip: chipSelection) 
+    for(const auto & ichip: this->getChipSelection()) 
     {
         // Clustersize histogram
 	std::string histoName(getHistoNameForChip(_clusterSizeHistoName,ichip));
