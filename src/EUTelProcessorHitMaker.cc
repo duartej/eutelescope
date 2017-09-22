@@ -383,8 +383,8 @@ void EUTelProcessorHitMaker::processEvent (LCEvent * event) {
                 // check the hack from Havard:
                 float xCoG(0.0f), yCoG(0.0f);
                 cluster->getCenterOfGravity(xCoG, yCoG);
-                double xDet = (xCoG + 0.5) * xPitch;
-                double yDet = (yCoG + 0.5) * yPitch; 
+                double xDet =(xCoG + 0.5)*xPitch;
+                double yDet =(yCoG + 0.5)*yPitch; 
 
                 streamlog_out(DEBUG) << "cluster[" << setw(4) << iCluster << "] on sensor[" << setw(3) << sensorID 
                     << "] at [" << setw(8) << setprecision(7) << xCoG << ":" << setw(8) << setprecision(7) << yCoG << "]"
@@ -519,12 +519,12 @@ void EUTelProcessorHitMaker::bookHistos(int sensorID)
 
     //Note in the local frame the origin is at the centre of the sensor. So we want this to look for hits in the -x/y direction, as well at the + axis.
     //We add and subtract a constant so we know for sure we can see all hits on the histogram.
-    const double constant=1.2;
-    double xMin =  -(geo::gGeometry().siPlaneXSize ( sensorID )/2)*constant;
-    double xMax = ( geo::gGeometry().siPlaneXSize ( sensorID )/2)*constant;   
+    //const double constant=1.2;
+    double xMin =  -(geo::gGeometry().siPlaneXSize ( sensorID )/2);//*constant;
+    double xMax = ( geo::gGeometry().siPlaneXSize ( sensorID )/2);//*constant;   
 
-    double yMin = -(geo::gGeometry().siPlaneYSize ( sensorID )/2)*constant;
-    double yMax = (geo::gGeometry().siPlaneYSize ( sensorID )/2)+constant; 
+    double yMin = -(geo::gGeometry().siPlaneYSize ( sensorID )/2);//*constant;
+    double yMax = (geo::gGeometry().siPlaneYSize ( sensorID )/2);//+constant; 
 
     int xNBin =    geo::gGeometry().siPlaneXNpixels ( sensorID );
     int yNBin =    geo::gGeometry().siPlaneYNpixels ( sensorID );
