@@ -185,12 +185,12 @@ void EUTelPreAlign::init()
 	    
             // 2-dimensional plots using the hits of the reference sensor matched 
             // with the current plane, note that for microstrips...
-            const double constant=1.2;
-            const double xMin =  -(geo::gGeometry().siPlaneXSize ( sensorID )/2)*constant;
-            const double xMax = ( geo::gGeometry().siPlaneXSize ( sensorID )/2)*constant;   
+            //const double constant=1.2;
+            const double xMin =  -(geo::gGeometry().siPlaneXSize ( sensorID )/2); //*constant;
+            const double xMax = ( geo::gGeometry().siPlaneXSize ( sensorID )/2); //*constant;   
 
-            const double yMin = -(geo::gGeometry().siPlaneYSize ( sensorID )/2)*constant;
-            const double yMax = (geo::gGeometry().siPlaneYSize ( sensorID )/2)+constant; 
+            const double yMin = -(geo::gGeometry().siPlaneYSize ( sensorID )/2); //*constant;
+            const double yMax = (geo::gGeometry().siPlaneYSize ( sensorID )/2); //*constant; 
 
             const int xNBin =    geo::gGeometry().siPlaneXNpixels ( sensorID );
             const int yNBin =    geo::gGeometry().siPlaneYNpixels ( sensorID );
