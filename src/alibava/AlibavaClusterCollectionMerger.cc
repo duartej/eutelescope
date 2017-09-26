@@ -414,11 +414,12 @@ void AlibavaClusterCollectionMerger::copyClustersInCollection(LCCollectionVec * 
         // Note the reference sensor has to be calling this function the last one, 
         // in that case, all the sensors IDs have been used, so first time is 
         // going to obtain the lowest ID number available to be used
-        int sensorID = this->getSensorID(static_cast<int>(inputSparseColDecoder(inputSparseFrame)["sensorID"]));
+        int sensorID(-1);
         if(isReferenceSensor)
         {
             sensorID = this->getReferenceSensorID();
         }
+        sensorID = this->getSensorID(static_cast<int>(inputSparseColDecoder(inputSparseFrame)["sensorID"]));
         // set Cell ID for sparse collection
         outputSparseColEncoder["sensorID"] = sensorID;
 	outputSparseColEncoder["sparsePixelType"] =static_cast<int>(inputSparseColDecoder(inputSparseFrame)["sparsePixelType"]);
