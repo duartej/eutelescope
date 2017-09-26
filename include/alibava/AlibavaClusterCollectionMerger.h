@@ -117,16 +117,21 @@ namespace alibava
             int _refSensorID;
             //! Functional to evaluate the reference sensor ID, which is defined
             //! as the lowest number not used by any of the other planes
+            // XXX TO BE DEPRECATED
             std::function<int()> getReferenceSensorID;
             //! Functional to update the sensorIDs, but once they are fill, just
             //! a dummy function returning the input
+            // XXX TO BE DEPRECATED
             std::function<int(const int &)>getSensorID;
+            // ID for the dut and reference introduced by the user
+            int _dutID;
+            int _referenceID;
             //! A function to be define its behaviour depending if the
             //! a reference alibava sensor must be processed or not
             std::function<bool(LCReader *,AlibavaEventImpl*& )> _checkAlibavaReferenceEvent;
             void copyClustersInCollection(LCCollectionVec * outputPulseColVec, LCCollectionVec * outputSparseColVec, 
                     LCCollectionVec * inputPulseColVec, LCCollectionVec * inputSparseColVec,
-                    bool isReferenceSensor=false);
+                    bool isDUTSensor=false,bool isReferenceSensor=false);
 	};	
 	//! A global instance of the processor
 	AlibavaClusterCollectionMerger gAlibavaClusterCollectionMerger;	

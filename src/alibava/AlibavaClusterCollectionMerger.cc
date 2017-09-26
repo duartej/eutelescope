@@ -75,6 +75,8 @@ AlibavaClusterCollectionMerger::AlibavaClusterCollectionMerger ():
     _refSensorID(-1),
     getReferenceSensorID(nullptr),
     getSensorID(nullptr),
+    _dutID(5),
+    _referenceID(7),
     _checkAlibavaReferenceEvent(nullptr)
 
 {
@@ -121,6 +123,10 @@ AlibavaClusterCollectionMerger::AlibavaClusterCollectionMerger ():
     registerInputCollection(LCIO::TRACKERDATA, "AlibavaSparseClusterCollectionName",
             "Name of the sparse cluster collection of alibava data",
             _alibavaSparseCollectionName, string("alibava_sparse_cluster") );
+
+    // The id asigned to the alibava sensors
+    registerProcessorParameter("DUTSensorID","The sensor ID assigned to the DUT",_dutID, int(5) );
+    registerProcessorParameter("REFSensorID","The sensor ID assigned to the REF",_referenceID, int(7) );
     ////////////
     // Output //
     ////////////    
@@ -164,6 +170,7 @@ void AlibavaClusterCollectionMerger::init ()
                 };
         _refPresent = true;
         // List the available sensor IDs for the telescope and DUT alibava
+        // To be deprecated 
         getSensorID = [this] (const int & id) -> int
             {
                 this->_usedSensorIDs.insert(id);
@@ -333,11 +340,11 @@ void AlibavaClusterCollectionMerger::readDataSource(int /* numEvents */)
                 // copy telescope clusters
 		copyClustersInCollection(outputPulseColVec, outputSparseColVec, telescopePulseColVec, telescopeSparseColVec);
                 // copy alibava cluster
-                copyClustersInCollection(outputPulseColVec, outputSparseColVec, alibavaPulseColVec, alibavaSparseColVec);
+                copyClustersInCollection(outputPulseColVec, outputSparseColVec, alibavaPulseColVec, alibavaSparseColVec,true);
                 // copy alibava Ref cluster
                 if(_refPresent)
                 {
-                    copyClustersInCollection(outputPulseColVec, outputSparseColVec, alibavaRefPulseColVec, alibavaRefSparseColVec,true);
+                    copyClustersInCollection(outputPulseColVec, outputSparseColVec, alibavaRefPulseColVec, alibavaRefSparseColVec,false,true);
                 }
             }
             
@@ -387,7 +394,7 @@ void AlibavaClusterCollectionMerger::readDataSource(int /* numEvents */)
 void AlibavaClusterCollectionMerger::copyClustersInCollection(LCCollectionVec * outputPulseColVec, 
         LCCollectionVec * outputSparseColVec, LCCollectionVec * inputPulseColVec, 
         LCCollectionVec * inputSparseColVec,
-        bool isReferenceSensor)
+        bool isDUTSensor,bool isReferenceSensor)
 {
     // Here is the Cell ID Encodes for pulseFrame and sparseFrame
     // CellID Encodes are introduced in eutelescope::EUTELESCOPE
@@ -417,9 +424,19 @@ void AlibavaClusterCollectionMerger::copyClustersInCollection(LCCollectionVec * 
         int sensorID(-1);
         if(isReferenceSensor)
         {
-            sensorID = this->getReferenceSensorID();
+            // DEPRECATED
+            // sensorID = this->getReferenceSensorID();
+            // Obtained from the used
+            sensorID = _referenceID;
         }
-        sensorID = this->getSensorID(static_cast<int>(inputSparseColDecoder(inputSparseFrame)["sensorID"]));
+        else if(isDUTSensor)
+        {
+            sensorID = _dutID;
+        }
+        else
+        {
+            sensorID = this->getSensorID(static_cast<int>(inputSparseColDecoder(inputSparseFrame)["sensorID"]));
+        }
         // set Cell ID for sparse collection
         outputSparseColEncoder["sensorID"] = sensorID;
 	outputSparseColEncoder["sparsePixelType"] =static_cast<int>(inputSparseColDecoder(inputSparseFrame)["sparsePixelType"]);
