@@ -1115,7 +1115,7 @@ int EUTelGeometryTelescopeGeoDescription::findNextPlane(  double* lpoint,  doubl
 	streamlog_out( DEBUG0 ) << "::findNextPlane look for next node, starting at node: " << node << " id: " << inode  << " currentSensorID: " << currentSensorID << std::endl;
 
 	//   double kStep = 1e-03;
-	while( node = gGeoManager->FindNextBoundaryAndStep() ) {
+	while( (node = gGeoManager->FindNextBoundaryAndStep()) ) {
 		 inode = node->GetIndex();
 		 streamlog_out( DEBUG0 ) << "::findNextPlane found next node: " << node << " id: " << inode << std::endl;
 		 const double* point = gGeoManager->GetCurrentPoint();
@@ -1219,12 +1219,15 @@ void EUTelGeometryTelescopeGeoDescription::updateSiPlanesLayout() {
 	for(size_t iPlane = 0; iPlane < _nPlanes; iPlane++) {
 		int sensorID =  _sensorIDVec.at(iPlane);
 
-		siplanesLayerLayout->setLayerPositionX( iPlane, siPlaneXPosition(sensorID) );
+		siplanesLayerLayout->setLayerPositionX(  iPlane, siPlaneXPosition(sensorID) );
 		siplanesLayerLayout->setLayerPositionY(  iPlane, siPlaneYPosition(sensorID) );
 		siplanesLayerLayout->setLayerPositionZ(  iPlane, siPlaneZPosition(sensorID) );
 		siplanesLayerLayout->setLayerRotationZY( iPlane, siPlaneXRotation(sensorID) );
 		siplanesLayerLayout->setLayerRotationZX( iPlane, siPlaneYRotation(sensorID) );
 		siplanesLayerLayout->setLayerRotationXY( iPlane, siPlaneZRotation(sensorID) );
+                // JDC, set the ID of the sensor (otherwise when the 
+                // z-order doesn't correspond to the sensor ID order, it'ss a mess
+                siplanesLayerLayout->setID(iPlane,sensorID);
 	}
 
 
