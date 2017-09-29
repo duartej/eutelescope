@@ -89,7 +89,10 @@ namespace eutelescope {
     std::vector<int > _dutPlanes;
 
     //! resolution of sensor planes
-    float _telResX, _telResY, _dutResX, _dutResY;
+    float _telResX; 
+    float _telResY;
+    float _dutResX;
+    float _dutResY;
     //! Nominal beam energy
     float _eBeam;
 
@@ -153,6 +156,9 @@ namespace eutelescope {
     std::map<int, int> _indexIDMap;
     std::vector<float> _radLength;
     std::vector<float> _sigmaX, _sigmaY;
+
+    // Keep track of the first plane at Z-positive (or at z=0)
+    int _plane_at_zero;
 
     //! Counters
     int _iRun, _iEvt, _nTracks, _nCandidates, n_failedNdof, n_failedChi2OverNdof, n_failedIsnan, n_passedNdof, n_passedChi2OverNdof, n_passedIsnan;

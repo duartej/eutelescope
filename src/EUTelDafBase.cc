@@ -127,10 +127,10 @@ EUTelDafBase::EUTelDafBase(std::string name) : marlin::Processor(name) {
 			    "List of sensor IDs for the DUT planes. Used to make the decision on whether ro accept the track or not. These planes are not used in track finder, and not in the track fitter unless option 'useDutsInFit' is set."
 			    , _dutPlanes ,std::vector<int>());
   registerOptionalParameter("Ebeam", "Beam energy [GeV], used to calculate amount of scatter", _eBeam,  static_cast < float > (120.0));
-  registerOptionalParameter("TelResolutionX", "Sigma of telescope resolution in the global X plane,", _telResX,  static_cast < float > (5.3));
-  registerOptionalParameter("TelResolutionY", "Sigma of telescope resolution in the global Y plane,", _telResY,  static_cast < float > (5.3));
-  registerOptionalParameter("DutResolutionX", "Sigma of telescope resolution in the global X plane,", _dutResX,  static_cast < float > (115.4));
-  registerOptionalParameter("DutResolutionY", "Sigma of telescope resolution in the global Y plane,", _dutResY,  static_cast < float > (14.4));
+  registerOptionalParameter("TelResolutionX", "Sigma of telescope resolution in the global X plane,", _telResX,  static_cast<float>(5.3));
+  registerOptionalParameter("TelResolutionY", "Sigma of telescope resolution in the global Y plane,", _telResY,  static_cast<float>(5.3));
+  registerOptionalParameter("DutResolutionX", "Sigma of telescope resolution in the global X plane,", _dutResX,  static_cast<float>(115.4));
+  registerOptionalParameter("DutResolutionY", "Sigma of telescope resolution in the global Y plane,", _dutResY,  static_cast<float>(14.4));
 
   //Material and resolution
   registerOptionalParameter("RadiationLengths","Radiation lengths of planes, ordered by z-pos..", _radLength, std::vector<float>());
@@ -365,6 +365,7 @@ void EUTelDafBase::init() {
   n_passedNdof =0; n_passedChi2OverNdof = 0; n_passedIsnan = 0;
   n_failedNdof =0; n_failedChi2OverNdof = 0; n_failedIsnan = 0;
   _initializedSystem = false;
+  _plane_at_zero = -1;
 
   //Set-uo the cluster finder
   if(_clusterFinderName == "simpleCluster") {
@@ -380,73 +381,99 @@ void EUTelDafBase::init() {
   _siPlanesLayerLayout = const_cast<gear::SiPlanesLayerLayout*> ( &(_siPlanesParameters->getSiPlanesLayerLayout() ));
 
   //Use map to sort planes by z
+  // Note that is reading the gear file sequential, so the "plane" will refer
+  // to the gear file order
   _zSort.clear();
-  for(int plane = 0; plane < _siPlanesLayerLayout->getNLayers(); plane++){
-    _zSort[ _siPlanesLayerLayout->getLayerPositionZ(plane) * 1000.0 ] = plane;
+  for(int gearOrder = 0; gearOrder < _siPlanesLayerLayout->getNLayers(); ++gearOrder)
+  {
+    _zSort[ _siPlanesLayerLayout->getLayerPositionZ(gearOrder) * 1000.0 ] = gearOrder;
     // --> [JDC] Below line is only adecuated if the planes have the same order in Z
     //           than their IDs, otherwise it is not true anymore 
     //           See that the "plane" variable is following the same order that it is 
     //           found the planes in the gear file 
-    //_indexIDMap[ _siPlanesLayerLayout->getID( plane )] = plane;
+    //_indexIDMap[ _siPlanesLayerLayout->getID( gearOrder)] = gearOrder;
+    //_IDindexMap[gearOrder] = _siPlanesLayerLayout->getID(gearOrder);
   }
 
-  //Add Planes to tracker system,
-  std::map<float, int>::iterator zit = _zSort.begin();
-  size_t index(0), nActive(0);
-  for( ; zit != _zSort.end(); index++, zit++){
-    _nRef.push_back(3);
-    const int sensorID = _siPlanesLayerLayout->getID( (*zit).second );
-    //Read sensitive as 0, in case the two are different
-    const float zPos  = _siPlanesLayerLayout->getSensitivePositionZ( (*zit).second )* 1000.0;
-    //+ 0.5 * 1000.0 *  _siPlanesLayerLayout->getSensitiveThickness( (*zit).second) ; // Do not move plane to center of plane, use front.
-    //Figure out what kind of plane we are dealing with
-    float errX(0.0f), errY(0.0f);
-    bool excluded = true;
+  //Add Planes to tracker system, in z-increasing order
+  // Then, the index variable is getting the z-order (as the planes
+  // are included in the system)
+  unsigned int index(0);
+  unsigned int nActive(0);
+  for(auto zit = _zSort.begin(); zit != _zSort.end(); ++index, ++zit)
+  {
+      _nRef.push_back(3);
+      const int gearOrderId = (*zit).second;
+      const int sensorID = _siPlanesLayerLayout->getID(gearOrderId);
+      //Read sensitive as 0, in case the two are different
+      const float zPos  = _siPlanesLayerLayout->getSensitivePositionZ(gearOrderId )* 1000.0;
+      //+ 0.5 * 1000.0 *  _siPlanesLayerLayout->getSensitiveThickness( (*zit).second) ; // Do not move plane to center of plane, use front.
+        
+      // Get scatter using x / x0
+      float radLength = _siPlanesLayerLayout->getLayerThickness(gearOrderId)/_siPlanesLayerLayout->getLayerRadLength(gearOrderId);
+      radLength += _siPlanesLayerLayout->getSensitiveThickness(gearOrderId)/_siPlanesLayerLayout->getSensitiveRadLength(gearOrderId);
 
-    // Get scatter using x / x0
-    float radLength = _siPlanesLayerLayout->getLayerThickness( (*zit).second ) /  _siPlanesLayerLayout->getLayerRadLength( (*zit).second );
-    radLength += _siPlanesLayerLayout->getSensitiveThickness( (*zit).second ) /  _siPlanesLayerLayout->getSensitiveRadLength( (*zit).second );
-
-    streamlog_out ( MESSAGE5 ) << " zPos:      " << zPos << " " << radLength ;
-    streamlog_out ( MESSAGE5 ) << " sen thick: " << _siPlanesLayerLayout->getSensitiveThickness( (*zit).second ) ;
-    streamlog_out ( MESSAGE5 ) << " sens rad:  " << _siPlanesLayerLayout->getSensitiveRadLength( (*zit).second ) << endl;
-    if( _radLength.size() > index){
-      radLength = _radLength.at(index);
-    } else {
-      _radLength.push_back(radLength);
-    }
-
-    float scatter = getScatterThetaVar( radLength );
+      streamlog_out ( MESSAGE5 ) << " zPos:      " << zPos << " " << radLength ;
+      streamlog_out ( MESSAGE5 ) << " sen thick: " << _siPlanesLayerLayout->getSensitiveThickness(gearOrderId) ;
+      streamlog_out ( MESSAGE5 ) << " sens rad:  " << _siPlanesLayerLayout->getSensitiveRadLength(gearOrderId) << std::endl;
+      if( _radLength.size() > index)
+      {
+          radLength = _radLength.at(index);
+      } 
+      else 
+      {
+          _radLength.push_back(radLength);
+      }      
+      float scatter = getScatterThetaVar( radLength );
+      
+      streamlog_out ( MESSAGE5 ) << " radlength: "<< radLength << std::endl;
+      streamlog_out ( MESSAGE5 ) << " scatter: "<< scatter << std::endl;
     
-    streamlog_out ( MESSAGE5 ) << " radlength: "<< radLength << endl;
-    streamlog_out ( MESSAGE5 ) << " scatter: "<< scatter << endl;
-    
-    //Is current plane a telescope plane?
-    if( find(_telPlanes.begin(), _telPlanes.end(), sensorID) != _telPlanes.end()){
-      _nRef.at(index) = 0;
-      errX = _telResX; errY = _telResY;
-      excluded = false;
-    }
-    //Is current plane a DUT plane?
-    if( find(_dutPlanes.begin(), _dutPlanes.end(), sensorID) != _dutPlanes.end()){
-      _nRef.at(index) = 0;
-      errX = _dutResX; errY = _dutResY;
-      scatter = getScatterThetaVar( radLength );
-    }
-    //If plane is neither Tel nor Dut, all we need is the zpos and scatter amount.
+      //Figure out what kind of plane we are dealing with
+      float errX(0.0f), errY(0.0f);
+      bool excluded = true;
+      
+      //Is current plane a telescope plane?
+      if( find(_telPlanes.begin(), _telPlanes.end(), sensorID) != _telPlanes.end())
+      {
+          _nRef.at(index) = 0;
+          errX = _telResX; errY = _telResY;
+          excluded = false;
+      }
+      //Is current plane a DUT plane?
+      if( find(_dutPlanes.begin(), _dutPlanes.end(), sensorID) != _dutPlanes.end())
+      {
+          _nRef.at(index) = 0;
+          errX = _dutResX; errY = _dutResY;
+          scatter = getScatterThetaVar( radLength );
+      }
+      //If plane is neither Tel nor Dut, all we need is the zpos and scatter amount.
 
-    //Add plane to tracker system
-    if(not excluded){ nActive++;}
-    _system.addPlane(sensorID, zPos , errX, errY, scatter, excluded);
-    gearRotate(index, (*zit).second);
-    // And keep track of the order introduced in the _system
-    _indexIDMap[sensorID] = index;
+      //Add plane to tracker system
+      if(not excluded)
+      { 
+          ++nActive;
+      }
+      _system.addPlane(sensorID, zPos , errX, errY, scatter, excluded);
+      gearRotate(index, gearOrderId);
+      // And keep track of the z-order, as is introduced in the _system
+      _indexIDMap[sensorID] = index;
+      // Note that the map is accessed in an increasing order of z
+      if(_plane_at_zero == -1 && zPos >= 0.0)
+      {
+          _plane_at_zero = index;
+      }
   }
- 
+  
   //Prepare track finder
-  switch( _trackFinderType ) {
-	case combinatorialKF: _system.setCKFChi2Cut(_normalizedRadius*_normalizedRadius); break;
-	case simpleCluster: _system.setClusterRadius(_normalizedRadius); break;
+  switch( _trackFinderType ) 
+  {
+      case combinatorialKF: 
+          _system.setCKFChi2Cut(_normalizedRadius*_normalizedRadius); 
+          break;
+      case simpleCluster: 
+          _system.setClusterRadius(_normalizedRadius); 
+          break;
   }
   _system.setNominalXdz(_nXdz); //What is the tangent angle of the beam? (Probably zero)
   _system.setNominalYdz(_nYdz);
@@ -463,16 +490,18 @@ void EUTelDafBase::init() {
   //freedom. 
   _ndofMin = -4 + _nSkipMax * 2 - 0.5;
   streamlog_out ( MESSAGE5 ) << "NDOF min is " << _ndofMin << endl;
-  if( _ndofMin < 0.5) {
-    streamlog_out ( ERROR5 ) << "Too few active planes(" << nActive << ") when " << _nSkipMax << " planes can be skipped." 
-			     << "Please check your configuration." << endl;
-    exit(1);
+  if( _ndofMin < 0.5) 
+  {
+      streamlog_out ( ERROR5 ) << "Too few active planes(" << nActive << ") when " << _nSkipMax << " planes can be skipped." 
+          << "Please check your configuration." << endl;
+      exit(1);
   }
   dafInit();
     
-  if(_histogramSwitch) {
-    bookHistos(); 
-    bookDetailedHistos();
+  if(_histogramSwitch) 
+  {
+      bookHistos(); 
+      bookDetailedHistos();
   }
 
   //Define region for edge masking
@@ -836,8 +865,20 @@ void EUTelDafBase::bookHistos()
     _aidaZvHitY = AIDAProcessor::histogramFactory(this)->createHistogram2D("ZvFitY", 20, -10000.0, 10000.0, 20, -10000.0, 10000.0);
     
     // Position first and last plane
-    const float z_first = 0.95*_system.planes.at(0).getZpos()/1000.0; // mm 
-    const float z_last  = 1.05*_system.planes.at(_system.planes.size()-1).getZpos()/1000.0; // mm
+    float z_first = _system.planes.at(0).getZpos()/1000.0;
+    float z_last  = _system.planes.end()->getZpos()/1000.0;
+
+    for(const auto & pl: _system.planes)
+    {
+        if( z_first > pl.getZpos())
+        {
+            z_first = 0.95*pl.getZpos()/1000.0;
+        }
+        if( z_last < pl.getZpos())
+        {
+            z_last = 1.05*pl.getZpos()/1000.0;
+        }
+    }
     _aidaHistoMap2D["AllResidmeasZvsmeasX"] =  AIDAProcessor::histogramFactory(this)->createHistogram2D( "AllResidmeasZvsmeasX",14 ,z_first, z_last, 500 ,-11000., 11000.);
     _aidaHistoMap2D["AllResidmeasZvsmeasY"] =  AIDAProcessor::histogramFactory(this)->createHistogram2D( "AllResidmeasZvsmeasY",14 ,z_first, z_last, 500 ,-6000., 6000.);
     _aidaHistoMap2D["AllResidfitZvsmeasX"] =  AIDAProcessor::histogramFactory(this)->createHistogram2D( "AllResidfitZvsmeasX",14   ,z_first, z_last, 500 ,-11000., 11000.);

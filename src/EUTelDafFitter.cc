@@ -221,10 +221,11 @@ void EUTelDafFitter::addToLCIO(daffitter::TrackCandidate<float,4>& track, LCColl
     fitpoint->setPosition(pos);
     // Covariance matrix of the fitted position
     // (stored as lower triangle matrix, i.e.  cov(xx),cov(y,x),cov(y,y) ).
+    // [JDC]: in mm^2 as the other magnitudes used
     float cov[TRKHITNCOVMATRIX];
-    cov[0]= estim.cov(0,0);
-    cov[1]= estim.cov(0,1);
-    cov[2]= estim.cov(1,1);
+    cov[0]= estim.cov(0,0)/(1000.0*1000.0);
+    cov[1]= estim.cov(0,1)/(1000.0*1000.0);
+    cov[2]= estim.cov(1,1)/(1000.0*1000.0);
     //Error of z position of fit is unclear to me, this would be a systematic alignment
     //error. Set to 0 along with all covariances.
     cov[3]=cov[4]=cov[5]=0.;
@@ -235,8 +236,10 @@ void EUTelDafFitter::addToLCIO(daffitter::TrackCandidate<float,4>& track, LCColl
     fittrack->addHit(fitpoint);
 
     streamlog_out(DEBUG3) << " hit : sensorID " << idHitEncoder["sensorID"] << " properties: " << idHitEncoder["properties"]  << std::endl;
-
-    if(plane == 0){
+    
+    // XXX POTENTIAL PROBLEM WHEN FIRST PLANE IS NOT IN z=0!! 
+    // [JDC] Introduced the _plane_at_zero
+    if(plane == static_cast<size_t>(_plane_at_zero)){
       refpoint[0] = pos[0];
       refpoint[1] = pos[1];
       refpoint[2] = pos[2];
