@@ -173,12 +173,18 @@ namespace alibava {
                 
                 // Signal of the seed vs. cluster seed channel
                 std::string _signalVsSeedHistoName;
+                
+                // Eta vs TDC time
+                std::string _etaVSTime;
 
 		// Eta vs Center of gravity
 		std::string _etaVSCoG;
 		
                 // Eta vs Unbiased Position Cluster Finding Algorithm
 		std::string _etaVSUCPFA;
+
+                // Eta vs TDC time
+                std::string _etaFromClusterVsTime;
 
 		// Eta (seed) vs Cluster size
 		std::string _etaVSClusterSize;

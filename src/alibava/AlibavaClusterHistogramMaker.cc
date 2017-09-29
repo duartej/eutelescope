@@ -72,8 +72,10 @@ AlibavaClusterHistogramMaker::AlibavaClusterHistogramMaker():
     _etaFromClusterVsSNRHistoName("hEtaFromClusterVsSNR"),
     _timeVsSeedHistoName("hTimeVsSeed"),
     _signalVsSeedHistoName("hSignalVsSeed"),
+    _etaVSTime("hEta_vs_Time"),
     _etaVSCoG("hEta_vs_CoG"),
     _etaVSUCPFA("hEta_vs_UCPFA"),
+    _etaFromClusterVsTime("hEtaFromCluster_vs_Time"),
     _etaVSClusterSize("hEta_vs_ClusterSize"),
     _etaFromClusterVSClusterSize("hEtaFromCluster_vs_ClusterSize"),
     _clusterSizeVsCoG("hClusterSize_vs_CoG"),
@@ -272,8 +274,10 @@ void AlibavaClusterHistogramMaker::fillListOfHistos()
     addToHistoCheckList_PerChip(_SNRVsHitAmplitudeHistoName);
     addToHistoCheckList_PerChip(_etaVsSNRHistoName);
     addToHistoCheckList_PerChip(_etaFromClusterVsSNRHistoName);
+    addToHistoCheckList_PerChip(_etaFromClusterVsTime);
     addToHistoCheckList_PerChip(_timeVsSeedHistoName);
     addToHistoCheckList_PerChip(_signalVsSeedHistoName);
+    addToHistoCheckList_PerChip(_etaVSTime);
     addToHistoCheckList_PerChip(_etaVSCoG);
     addToHistoCheckList_PerChip(_etaVSUCPFA);
     addToHistoCheckList_PerChip(_etaVSClusterSize);
@@ -456,6 +460,17 @@ void AlibavaClusterHistogramMaker::fillHistos(AlibavaCluster * anAlibavaCluster,
     // Then fill eta histograms
     const float eta            = anAlibavaCluster->getEta();
     const float etaFromCluster = anAlibavaCluster->getEtaFromCluster();
+    
+    // the Eta (seed) vs. time
+    histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_etaVSTime,ichip)]);
+    histo2->Fill(time,eta);
+    
+    // the Eta (cluster, size 2 only) vs. time
+    if(clusterSize == 2)
+    {
+        histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_etaFromClusterVsTime,ichip)]);
+        histo2->Fill(time,etaFromCluster);
+    }
     
     // the Eta (seed) vs. SNR
     histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_etaVsSNRHistoName,ichip)]);

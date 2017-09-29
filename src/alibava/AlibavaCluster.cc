@@ -163,13 +163,8 @@ float AlibavaCluster::getEtaFromCluster()
     {
         return -1;
     }
-    // Find the left cluster and its signal 
-    //const int seedStripNum = getSeedChanNum();
     // Note that the seed is always the first element of 
     // the cluster
-    //const float seedSignal = getSignalPolarity()*getSignal(0);
-    //float leftSignal = 0;
-    //float rightSignal = 0;
     std::multimap<float,int> channelsMemberOrderMap;
     // Store the multimap to use the highest signal channels
     for(int imember=0; imember<getClusterSize(); ++imember)
@@ -181,51 +176,19 @@ float AlibavaCluster::getEtaFromCluster()
     auto prevToHighestSignal = std::next(channelsMemberOrderMap.rbegin());
     
     // A guess
-    float leftSignal = highestSignal->first;
-    float rightSignal= prevToHighestSignal->first;
+    //float leftSignal = highestSignal->first;
+    //float rightSignal= prevToHighestSignal->first;
+    auto leftSignal = highestSignal;
+    auto rightSignal = prevToHighestSignal;
     // Check if the guess was right, i.e. the highest signal channel
-    // is the leftest channel, otherwise, change the order
-    if( highestSignal->second > prevToHighestSignal->second)
+    // is the leftest channel (i.e, the lower channel), otherwise, change the order
+    if( leftSignal->second > rightSignal->second)
     {
-        leftSignal = prevToHighestSignal->first;
-        rightSignal= highestSignal->first;
-//std::cout << getClusterSize() << "-- LEFT Signal: " << leftSignal << " (Ch:" << prevToHighestSignal->second << "). RIGHT signal: " << rightSignal << " (Ch:" << highestSignal->second << ")" << std::endl;
-//    }
-//else{
-//std::cout << getClusterSize() << "-- LEFT Signal: " << leftSignal << " (Ch:" << highestSignal->second << "). RIGHT signal: " << rightSignal << " (Ch:" << prevToHighestSignal->second << ")" << std::endl;
-}
+        leftSignal = prevToHighestSignal;
+        rightSignal= highestSignal;
+    }
 
-    /*{
-        const int ichan = getChanNum(imember);
-        // Seed channel to the left description (see [1])
-        if(ichan <= seedStripNum)
-        {
-            leftSignal += getSignalPolarity()*getSignal(imember);
-        }
-        else
-        {
-            rightSignal += getSignalPolarity()*getSignal(imember);
-        }
-    }*/
-    //Get the left (the lowest channel number) and right 
-    // (the highest channel number) signals
-    //const float leftSignal  = static_cast<float>(getSignalPolarity()*getSignal(channelsMemberOrderMap.begin()->second));
-    //const float rightSignal = static_cast<float>(getSignalPolarity()*getSignal(channelsMemberOrderMap.end()->second));
-    
-    /*float eta = -1;
-    if(leftSignal > rightSignal) 
-    {
-        // then seed channel is on the right
-        eta = leftSignal/(leftSignal + seedSignal);
-    }
-    else 
-    {
-        // seed channel is on the left
-        eta = seedSignal/(seedSignal + rightSignal);
-    }
-    return eta;*/
-    
-    return leftSignal/(leftSignal+rightSignal);
+    return leftSignal->first/(leftSignal->first+rightSignal->first);
 }
 
 void AlibavaCluster::setEta(float eta)
