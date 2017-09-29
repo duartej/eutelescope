@@ -151,22 +151,27 @@ void EUTelTreeCreator::init()
     _branches_float["TDCtime"]   = -1;
     _branches_float["EventTemperature"]   = -1;
     _branches_int["EventMask"]   = -1;
-    // DUT hits position
-    // the sensor plane ID
-    _branches_I["hit_plane"] = new std::vector<int>;
-    // DUT hits position
-    _branches["hit_X"] = new std::vector<float>;
-    _branches["hit_Y"] = new std::vector<float>;
-    _branches["hit_Z"] = new std::vector<float>;
-    _branches["hit_XLocal"] = new std::vector<float>;
-    _branches["hit_YLocal"] = new std::vector<float>;
-    _branches["hit_ZLocal"] = new std::vector<float>;
-    // the total charge of the cluster
-    _branches["hit_total_charge"] = new std::vector<float>;
-    //_branches["hit_total_noise"] = new std::vector<float>;
-    //_branches["hit_cluster_SNR"] = new std::vector<float>;
-    // the number of strips belong to this cluster
-    _branches_I["hit_Ncluster"] = new std::vector<int>;
+    // For each DUT create a branch
+    //
+    for(auto & _id: _dutPlanes)
+    {
+        const std::string id_str(std::to_string(_id));
+        // the sensor plane ID
+        _branches_I["hit_plane_"+id_str] = new std::vector<int>;
+        // DUT hits position
+        _branches["hit_X_"+id_str] = new std::vector<float>;
+        _branches["hit_Y_"+id_str] = new std::vector<float>;
+        _branches["hit_Z_"+id_str] = new std::vector<float>;
+        _branches["hit_XLocal_"+id_str] = new std::vector<float>;
+        _branches["hit_YLocal_"+id_str] = new std::vector<float>;
+        _branches["hit_ZLocal_"+id_str] = new std::vector<float>;
+        // the total charge of the cluster
+        _branches["hit_total_charge_"+id_str] = new std::vector<float>;
+        //_branches["hit_total_noise"] = new std::vector<float>;
+        //_branches["hit_cluster_SNR"] = new std::vector<float>;
+        // the number of strips belong to this cluster
+        _branches_I["hit_Ncluster_"+id_str] = new std::vector<int>;
+    }
 
     // Create the elements to fill the branches
     // track related
@@ -174,28 +179,43 @@ void EUTelTreeCreator::init()
     _branches["trk_Ndf"]  = new std::vector<float>;
     _branches["trk_dxdz"] = new std::vector<float>;
     _branches["trk_dydz"] = new std::vector<float>;
-    
-    // Hits position associated to the tracks
-    // The corresponding track element
-    _branches_I["trk_hit_meas_index"]= new std::vector<int>;
-    _branches_I["trk_hit_fit_index"]= new std::vector<int>;
-    // The sensor plane of the hit
-    _branches_I["trk_hit_meas_plane"]= new std::vector<int>;
-    _branches_I["trk_hit_fit_plane"]= new std::vector<int>;
-    // the position
-    _branches["trk_hit_meas_X"] = new std::vector<float>;
-    _branches["trk_hit_meas_Y"] = new std::vector<float>;
-    _branches["trk_hit_meas_Z"] = new std::vector<float>;
-    _branches["trk_hit_fit_X"]  = new std::vector<float>;
-    _branches["trk_hit_fit_Y"]  = new std::vector<float>;
-    _branches["trk_hit_fit_Z"]  = new std::vector<float>;
-    // The equivalent in the local coordiante system (at the sensor plane)
-    _branches["trk_hit_meas_XLocal"] = new std::vector<float>;
-    _branches["trk_hit_meas_YLocal"] = new std::vector<float>;
-    _branches["trk_hit_meas_ZLocal"] = new std::vector<float>;
-    _branches["trk_hit_fit_XLocal"]  = new std::vector<float>;
-    _branches["trk_hit_fit_YLocal"]  = new std::vector<float>;
-    _branches["trk_hit_fit_ZLocal"]  = new std::vector<float>;
+    _branches["trk_refPoint_X"] = new std::vector<float>;
+    _branches["trk_refPoint_Y"] = new std::vector<float>;
+    _branches["trk_refPoint_Z"] = new std::vector<float>;
+    // Errors at x and y
+    _branches["trk_refPoint_err_X"] = new std::vector<float>;
+    _branches["trk_refPoint_err_Y"] = new std::vector<float>;
+
+    std::vector<int> allPlanes;
+    allPlanes.reserve(_telescopePlanes.size()+_dutPlanes.size());
+    allPlanes.insert(allPlanes.end(),_telescopePlanes.begin(),_telescopePlanes.end());
+    allPlanes.insert(allPlanes.end(),_dutPlanes.begin(),_dutPlanes.end());
+
+    for(auto & id_tel: allPlanes)
+    {
+        const std::string pl_str(std::to_string(id_tel));
+        // Hits position associated to the tracks
+        // The corresponding track element
+        _branches_I["trk_hit_meas_index_"+pl_str]= new std::vector<int>;
+        _branches_I["trk_hit_fit_index_"+pl_str]= new std::vector<int>;
+        // The sensor plane of the hit
+        _branches_I["trk_hit_meas_plane_"+pl_str]= new std::vector<int>;
+        _branches_I["trk_hit_fit_plane_"+pl_str]= new std::vector<int>;
+        // the position
+        _branches["trk_hit_meas_X_"+pl_str] = new std::vector<float>;
+        _branches["trk_hit_meas_Y_"+pl_str] = new std::vector<float>;
+        _branches["trk_hit_meas_Z_"+pl_str] = new std::vector<float>;
+        _branches["trk_hit_fit_X_"+pl_str]  = new std::vector<float>;
+        _branches["trk_hit_fit_Y_"+pl_str]  = new std::vector<float>;
+        _branches["trk_hit_fit_Z_"+pl_str]  = new std::vector<float>;
+        // The equivalent in the local coordiante system (at the sensor plane)
+        _branches["trk_hit_meas_XLocal_"+pl_str] = new std::vector<float>;
+        _branches["trk_hit_meas_YLocal_"+pl_str] = new std::vector<float>;
+        _branches["trk_hit_meas_ZLocal_"+pl_str] = new std::vector<float>;
+        _branches["trk_hit_fit_XLocal_"+pl_str]  = new std::vector<float>;
+        _branches["trk_hit_fit_YLocal_"+pl_str]  = new std::vector<float>;
+        _branches["trk_hit_fit_ZLocal_"+pl_str]  = new std::vector<float>;
+    }
     
 
     // And attach them to the tree
@@ -334,12 +354,19 @@ void EUTelTreeCreator::processEvent (LCEvent * event)
         _branches["trk_Ndf"]->push_back(track->getNdf());
         _branches["trk_dxdz"]->push_back(track->getOmega());
         _branches["trk_dydz"]->push_back(track->getPhi());
-        
+        const float * refPoint = track->getReferencePoint();
+        _branches["trk_refPoint_X"]->push_back(refPoint[0]);
+        _branches["trk_refPoint_Y"]->push_back(refPoint[1]);
+        _branches["trk_refPoint_Z"]->push_back(refPoint[2]);
+        // Covariance matrix for the reference point
+        bool is_refpoint_err_stored = false;
+
         // Now the hits
         TrackerHitVec hitvec = track->getTrackerHits();
         for(unsigned int k = 0 ; k < hitvec.size(); ++k)
         {
             const int sensorID = trkHitDecoder(hitvec[k])["sensorID"];
+            const std::string pl_str(std::to_string(sensorID));
             std::string xname("trk_hit_");
             std::string yname("trk_hit_");
             std::string zname("trk_hit_");
@@ -352,26 +379,40 @@ void EUTelTreeCreator::processEvent (LCEvent * event)
             if((trkHitDecoder(hitvec[k])["properties"] & kFittedHit) > 0)
             {
                 // Fitted hits
-                xname += "fit_X";
-                yname += "fit_Y";
-                zname += "fit_Z";
-                xnameLocal += "fit_XLocal";
-                ynameLocal += "fit_YLocal";
-                znameLocal += "fit_ZLocal";
-                nameIndex += "fit_index";
-                namePlane += "fit_plane";
+                xname += "fit_X_"+pl_str;
+                yname += "fit_Y_"+pl_str;
+                zname += "fit_Z_"+pl_str;
+                xnameLocal += "fit_XLocal_"+pl_str;
+                ynameLocal += "fit_YLocal_"+pl_str;
+                znameLocal += "fit_ZLocal_"+pl_str;
+                nameIndex += "fit_index_"+pl_str;
+                namePlane += "fit_plane_"+pl_str;
+                // The Covariance matrix of the relevant fitted hit
+                // contains the [ sigma_XX, sigma_yX, sigma_yy, ----- ] 
+                // See EUTelDafFitter.cc around L224
+                // Get the covariance matrix if this is the reference plane 
+                // point: 
+                if( ! is_refpoint_err_stored 
+                        && std::fabs(hitvec[k]->getPosition()[2]-refPoint[2]) < 1e-9)
+                {
+                    const auto & covmatrix = hitvec[k]->getCovMatrix();
+                    _branches["trk_refPoint_err_X"]->push_back(std::sqrt(covmatrix[0]));
+                    _branches["trk_refPoint_err_Y"]->push_back(std::sqrt(covmatrix[2]));
+                    is_refpoint_err_stored =true;
+                }
+        
             }
             else
             {
                 // Or measured
-                xname += "meas_X";
-                yname += "meas_Y";
-                zname += "meas_Z";
-                xnameLocal += "meas_XLocal";
-                ynameLocal += "meas_YLocal";
-                znameLocal += "meas_ZLocal";
-                nameIndex += "meas_index";
-                namePlane += "meas_plane";
+                xname += "meas_X_"+pl_str;
+                yname += "meas_Y_"+pl_str;
+                zname += "meas_Z_"+pl_str;
+                xnameLocal += "meas_XLocal_"+pl_str;
+                ynameLocal += "meas_YLocal_"+pl_str;
+                znameLocal += "meas_ZLocal_"+pl_str;
+                nameIndex += "meas_index_"+pl_str;
+                namePlane += "meas_plane_"+pl_str;
             }
             // The track index and plane ID
             _branches_I[nameIndex]->push_back(itrk);
@@ -398,21 +439,22 @@ void EUTelTreeCreator::processEvent (LCEvent * event)
     {
         // Extract the sensorid
         const int sensorID_dut = trkHitDecoder(dutHit)["sensorID"];
-        _branches_I["hit_plane"]->push_back(sensorID_dut);
+        const std::string id_str(std::to_string(sensorID_dut));
+        _branches_I["hit_plane_"+id_str]->push_back(sensorID_dut);
 
       	const double* posdut = dutHit->getPosition();
-        _branches["hit_X"]->push_back(posdut[0]);
-        _branches["hit_Y"]->push_back(posdut[1]);
-        _branches["hit_Z"]->push_back(posdut[2]);
+        _branches["hit_X_"+id_str]->push_back(posdut[0]);
+        _branches["hit_Y_"+id_str]->push_back(posdut[1]);
+        _branches["hit_Z_"+id_str]->push_back(posdut[2]);
         // The local fit
         double posdut_local[3];
         geo::gGeometry().master2Local(sensorID_dut,posdut,posdut_local);
-        _branches["hit_XLocal"]->push_back(static_cast<float>(posdut_local[0]));
-        _branches["hit_YLocal"]->push_back(static_cast<float>(posdut_local[1]));
-        _branches["hit_ZLocal"]->push_back(static_cast<float>(posdut_local[2]));
+        _branches["hit_XLocal_"+id_str]->push_back(static_cast<float>(posdut_local[0]));
+        _branches["hit_YLocal_"+id_str]->push_back(static_cast<float>(posdut_local[1]));
+        _branches["hit_ZLocal_"+id_str]->push_back(static_cast<float>(posdut_local[2]));
         // The total Charge, noise and SNR
         auto rcluster = Utility::GetClusterFromHit(dutHit);
-        _branches["hit_total_charge"]->push_back(rcluster->getTotalCharge());
+        _branches["hit_total_charge_"+id_str]->push_back(rcluster->getTotalCharge());
         //_branches["hit_total_noise"]->push_back(rcluster->getClusterNoise());
         //_branches["hit_cluster_SNR"]->push_back(rcluster->getClusterSNR());
         rcluster.reset(nullptr);
@@ -423,13 +465,13 @@ void EUTelTreeCreator::processEvent (LCEvent * event)
         if(rawhits.size() > 0 && rawhits[0] != nullptr)
         {
             // Note that the TrackDataImpl::getChargeValues() function returns a vector which
-            // contains 
-            _branches_I["hit_Ncluster"]->push_back(static_cast<TrackerDataImpl*>(rawhits[0])->getChargeValues().size()/4);
+            // contains  ... see function at (??)
+            _branches_I["hit_Ncluster_"+id_str]->push_back(static_cast<TrackerDataImpl*>(rawhits[0])->getChargeValues().size()/4);
         }
         else
         {
             // Something went wrong.. this never should happen
-            _branches_I["hit_Ncluster"]->push_back(-1);
+            _branches_I["hit_Ncluster_"+id_str]->push_back(-1);
         }
 
     }
