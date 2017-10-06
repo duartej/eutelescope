@@ -32,6 +32,9 @@
 #endif
 
 // lcio includes <.h>
+#include <IO/LCWriter.h>
+#include <EVENT/LCFloatVec.h>
+#include <IMPL/LCCollectionVec.h> 
 #include <lcio.h>
 #include <UTIL/LCTOOLS.h>
 #include <UTIL/CellIDEncoder.h>
@@ -44,8 +47,12 @@
 
 // ROOT includes ".h"
 #include "TH1F.h"
+#include "TH1D.h"
 #include "TH2F.h"
 #include "TH1I.h"
+#include "TF1.h"
+#include "TGraphErrors.h"
+#include "TCanvas.h"
 
 // system includes <>
 #include <string>
@@ -70,7 +77,10 @@ AlibavaSeedClustering::AlibavaSeedClustering () :
     _etaHistoName("hEta"),
     _clusterSizeHistoName("hClusterSize"),
     _clusterSizePerEvtHistoName("hClusterPerEvent"),
-    _clusterChargePerTDCTimeHistoName("hClusterChargePerTDCTime")
+    _clusterChargePerTDCTimeHistoName("hClusterChargePerTDCTime"),
+    _xtLCIOFile("crosstalkfactors.slcio"),
+    _nNeighbourgs(8),
+    _neighbourgsHistoName("hSeedNeighbourgs")
 {
     // modify processor description
     _description ="AlibavaSeedClustering finds clusters using seed "\
@@ -106,6 +116,10 @@ AlibavaSeedClustering::AlibavaSeedClustering () :
             "signals, any other value will be disregarded and the signal "\
             "will be assumed to be positive ",
             _signalPolarity, int (-1));
+    
+    registerProcessorParameter ("xtLCIOFile",
+            "Name of the LCIO file where is going to be stored the"\
+            " cross-talk factors",_xtLCIOFile,std::string("crosstalk_factors.slcio"));
 }
 
 
@@ -342,6 +356,9 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
     //    vector must be used as: seedChan+initial_neighbour[k]
     const std::vector<int> initial_neighbour = { -1, 1 };
         
+    // Get the pointer to the histo
+    TH2F * hSeedNeighbours = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_neighbourgsHistoName,chipnum)]);
+
     // now form clusters starting from the seed channel 
     // that has highest SNR
     int clusterID = 0;
@@ -371,7 +388,7 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
         acluster.setSignalPolarity(_signalPolarity);
         acluster.setClusterID(clusterID);
         ++clusterID;
-		
+
 	// add seed channel to the cluster
         acluster.add(seedChan, dataVec[seedChan]);
         // mask seed channel so no other cluster can use it!
@@ -386,6 +403,7 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
         {
             // Find the initial neighbour 
             const int ichanInitial=seedChan+initial_neighbour[k];
+
             // start the inclusion of neighbours
             for(int ichan=ichanInitial;  ; next_strip_functor[k](ichan))
             {
@@ -404,6 +422,9 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
                     thereIsNonBondedChan=true;
                     break;
                 }
+                // Fill the neighbour histo (left < 0; right >0)
+                //hSeedNeighbours->Fill(ichan-seedChan,dataVec[ichan]/dataVec[seedChan]);
+
                 // And the channel if possible
                 if(channel_can_be_used[ichan])
                 {
@@ -425,6 +446,23 @@ std::vector<AlibavaCluster> AlibavaSeedClustering::findClusters(TrackerDataImpl 
             // fill the histograms and add them to the cluster vector
             this->fillHistos(acluster);
             clusterVector.push_back(acluster);
+        }
+
+        // Cross-talk diagnosis plot
+        if(acluster.getClusterSize() == 1)
+        {
+            for(int ineigh=1; ineigh < _nNeighbourgs && ineigh > 0 && ineigh < ALIBAVA::NOOFCHANNELS; ++ineigh)
+            {
+                // Be sure the neighbourgs are in equal conditions 
+                // (no seed next-to-neighbourg)
+                if(std::find_if(seedCandidates.begin(),seedCandidates.end(), 
+                            [&seedChan,&ineigh] (const int & ch) { return (ch == seedChan-ineigh-1 || ch == seedChan+ineigh+1); }) != seedCandidates.end()) 
+                {
+                   // Found another cluster/seed too close
+                   break;
+                }
+                hSeedNeighbours->Fill(ineigh,(dataVec[seedChan-ineigh]-dataVec[seedChan+ineigh])/dataVec[seedChan]);
+            }
         }
     }
     
@@ -504,6 +542,110 @@ void AlibavaSeedClustering::end()
         streamlog_out ( MESSAGE5 ) << _numberOfSkippedEvents
             <<" events skipped since they are masked" << std::endl;
     }
+
+    // Set in the proper directory, we are going to 
+    // store some new histograms and Graphs
+    AIDAProcessor::tree(this)->cd(this->name());
+
+    // Prepare the averaged of the relative charge difference 
+    // between the adjacent channels to a seed
+    TCanvas *canvas = new TCanvas("aux_canvas");
+    TGraphErrors * gr = new TGraphErrors();
+    gr->SetTitle(";Neighbourg distance; <(Q_{seed-1}-Q_{seed+1})/Q_{seed}>");
+
+    // The collection to be filled with the cross-talk factors
+    LCCollectionVec * constantsCollection = new LCCollectionVec(LCIO::LCFLOATVEC);
+    // The LCIO vector to be stored
+    EVENT::LCFloatVec * xtconstant = new EVENT::LCFloatVec();
+    // Evaluate the cross-talk factors
+    for(const auto & chipnum: this->getChipSelection())
+    {        
+        // Get the pointer to the histo 
+        TH2F * hSeedNeighbours = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_neighbourgsHistoName,chipnum)]);
+        int igr = 0;
+        for(int xbin = 2; xbin < hSeedNeighbours->GetNbinsX()+1; ++xbin, ++igr)
+        {
+            const int sd = hSeedNeighbours->GetXaxis()->GetBinCenter(xbin);
+            const std::string seed_distance(std::to_string(static_cast<int>(sd)));
+            // XXX: Just using the two first neighbourgs
+            /*if( seed_distance > 2 )
+            {
+                break;
+            }*/
+            // Get the projection histogram
+            const std::string projection_name(std::string(hSeedNeighbours->GetName())+"_Neighbourg_"+seed_distance);
+            TH1D * hproj = hSeedNeighbours->ProjectionY(projection_name.c_str(),xbin,xbin);
+            
+            // A first gaussian estimation
+            TF1 * gaus = new TF1(std::string(projection_name+"_gaus").c_str(),"gaus",-0.07,0.07);
+            hproj->Fit(gaus,"QNR");
+            const std::vector<double> gaus_parameters { gaus->GetParameter(0),gaus->GetParameter(1), gaus->GetParameter(2) };
+
+            // A fine model, adding a polynomial for the continous background
+            TF1 * mod = new TF1(std::string(projection_name+"_gaus_cheb").c_str(),"gaus(0)+cheb2(3)");
+            // - Initialize the gausian parameters, the polynomial is going to be easy to fit
+            for(int k=0; k < gaus->GetNumberFreeParameters(); ++k)
+            {
+                // Note that the gausian in the model is set the first one,
+                // therefore can do that
+                mod->SetParameter(k,gaus->GetParameter(k));
+            }
+            // Now fit the full model
+            hproj->Fit(mod,"Q");
+
+            // Update the mean graph
+            gr->SetPoint(igr,sd,mod->GetParameter(1));
+            gr->SetPointError(igr,0.0,mod->GetParameter(2)/std::sqrt(hproj->GetEntries()));
+
+            // Store it in the DB
+            xtconstant->push_back(mod->GetParameter(1));
+            
+            // Delete histos and graphs
+            delete gaus;
+            gaus = nullptr;
+            delete mod;
+            mod = nullptr;
+        }
+    }
+    // Store the graph
+    gr->Write("gRelSeedChargeMean");
+    delete gr;
+    gr = nullptr;
+    delete canvas;
+    canvas =nullptr;
+    // Store the DB
+    constantsCollection->push_back(xtconstant);
+    
+    // Creating the DB to store the cross-talk coefficients
+    LCWriter* lcWriter = LCFactory::getInstance()->createLCWriter();
+    try 
+    {
+        lcWriter->open( _xtLCIOFile,LCIO::WRITE_NEW);
+    } 
+    catch(IOException& e) 
+    {
+        streamlog_out ( ERROR4 ) << e.what() << std::endl;
+        exit(-1);
+    }
+    streamlog_out ( MESSAGE5 ) << "Cross-talk factors being written to " << _xtLCIOFile << endl;
+    
+    LCRunHeaderImpl * lcHeader  = new LCRunHeaderImpl;
+    lcHeader->setRunNumber( 0 );
+    lcWriter->writeRunHeader(lcHeader);
+    delete lcHeader;
+    LCEventImpl * event = new LCEventImpl;
+    event->setRunNumber( 0 );
+    event->setEventNumber( 0 );
+    LCTime * now = new LCTime;
+    event->setTimeStamp( now->timeStamp() );
+    delete now;
+        
+    event->addCollection(constantsCollection, "xtfactors");
+    lcWriter->writeEvent(event);
+    delete event;
+    lcWriter->close();
+
+
     streamlog_out ( MESSAGE4 ) << "Successfully finished" << std::endl;	
 }
 
@@ -550,6 +692,11 @@ void AlibavaSeedClustering::bookHistos()
         TH2F * hClusterChargePerTDCtime = new TH2F(histoName.c_str(),title.c_str(),100, 0, 30,1000,0,1000);
         _rootObjectMap.insert(make_pair(histoName, hClusterChargePerTDCtime));
 	
+        histoName=getHistoNameForChip(_neighbourgsHistoName,ichip);
+        title = "Seed neighbourgs (chip "+to_string(ichip)+string(");Neighbourg distance to Seed; Relative charge to seed;");
+        TH2F * hSeedNeighbourg = new TH2F(histoName.c_str(),title.c_str(),_nNeighbourgs, -0.5, _nNeighbourgs-0.5,200,-0.5,0.5);
+        _rootObjectMap.insert(make_pair(histoName, hSeedNeighbourg));
+
     } // end of loop over selected chips
     streamlog_out ( MESSAGE1 )  << "End of Booking histograms. " << endl;
 }

@@ -174,6 +174,15 @@ namespace alibava
     	    std::string _clusterSizePerEvtHistoName;
             // 
             std::string _clusterChargePerTDCTimeHistoName;
+
+            // Name of the LCIO file where is going to be stored the
+            // cross-talk factors
+            std::string _xtLCIOFile;
+
+            // number of neighbourgs for the plot
+            int _nNeighbourgs;
+            // 
+            std::string _neighbourgsHistoName;
     };
     //! A global instance of the processor
     AlibavaSeedClustering gAlibavaSeedClustering;
