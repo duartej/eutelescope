@@ -45,6 +45,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cstdio>
+#include <numeric>
 
 using namespace marlin;
 using namespace gear;
@@ -169,6 +170,8 @@ void EUTelTreeCreator::init()
         _branches["hit_total_charge_"+id_str] = new std::vector<float>;
         //_branches["hit_total_noise"] = new std::vector<float>;
         //_branches["hit_cluster_SNR"] = new std::vector<float>;
+        // The eta of the cluster
+        _branches["hit_cluster_eta_"+id_str] = new std::vector<float>;
         // the number of strips belong to this cluster
         _branches_I["hit_Ncluster_"+id_str] = new std::vector<int>;
     }
@@ -465,15 +468,52 @@ void EUTelTreeCreator::processEvent (LCEvent * event)
         if(rawhits.size() > 0 && rawhits[0] != nullptr)
         {
             // Note that the TrackDataImpl::getChargeValues() function returns a vector which
-            // contains  ... see function at (??)
-            _branches_I["hit_Ncluster_"+id_str]->push_back(static_cast<TrackerDataImpl*>(rawhits[0])->getChargeValues().size()/4);
+            // contains [X-coordinate,Y-coordinate,ADC counts,time] per each element of the cluster
+            // See addSparsePixel function at EUTelTrackerDataInterfacerImpl.hcc
+            auto & raw_clusters = static_cast<TrackerDataImpl*>(rawhits[0])->getChargeValues();
+            _branches_I["hit_Ncluster_"+id_str]->push_back(raw_clusters.size()/4);
+            if(raw_clusters.size() <= 4)
+            {
+                continue;
+            }
+            // Obtain the eta (whenever the cluster is N > 2)
+            // ----------------------------------------------
+            // Using all the elements in the cluster
+            /*std::map<int,float> channelsOrdered;
+            for(int k=0; k < raw_clusters.size()-3.0; k+=4)
+            {
+                channelsOrdered.insert(std::pair<int,float>(static_cast<int>(raw_clusters[k]),raw_clusters[k+2]));
+            }
+            // Just add all the charges
+            float leftCh = channelsOrdered.begin()->second;
+            float totalSignal = std::accumulate(channelsOrdered.begin(),channelsOrdered.end(), 0.0,
+                    [] (const float & last_element, const std::pair<int,float> & it2) { return (last_element+it2.second); });
+            _branches["hit_cluster_eta_"+id_str]->push_back(leftCh/totalSignal);*/
+            // Just using the edges on the cluster
+            std::map<float,int> channelsOrderedBySignal;
+            for(int k=0; k < raw_clusters.size()-3.0; k+=4)
+            {
+                channelsOrderedBySignal.insert(std::pair<float,int>(raw_clusters[k+2],static_cast<int>(raw_clusters[k])));
+            }
+            // Using the two highest signals
+            auto highestSignal = channelsOrderedBySignal.rbegin();
+            auto nextToHighestSignal = std::next(channelsOrderedBySignal.rbegin());
+            // Let's guess that the highest signal is on the left,
+            auto left = highestSignal;
+            auto right = nextToHighestSignal;
+            if( left->second > right->second )
+            {
+                // not correct guess, change it
+                left = nextToHighestSignal;
+                right= highestSignal;
+            }
+            _branches["hit_cluster_eta_"+id_str]->push_back(left->first/(left->first+right->first));
         }
         else
         {
             // Something went wrong.. this never should happen
             _branches_I["hit_Ncluster_"+id_str]->push_back(-1);
         }
-
     }
     // Fill the tree
     _tree->Fill();
