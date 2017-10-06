@@ -211,13 +211,15 @@ void AlibavaCrosstalkCorrection::processEvent (LCEvent * anEvent)
                 // from the difference bewteen left-right, and we are
                 // applying the filter by subtracting to the right channel 
                 // (to compensate back)
-                // Check that they are positive??
-                if( (*xtfactors)[i] > 0)
+                // Check that they are positive?? XXX: IT seems to behave 
+                // better (convergence of the factorrs) if we don't do 
+                // that check (but needs a minimum of N=5
+                /*if( (*xtfactors)[i] > 0)
                 {
                     // Assuming this is the last acceptable 
                     // left to right cross-talk
                     break;
-                }
+                }*/
                 _f.push_back((-1.0)*(*xtfactors)[i]);
             }
 
