@@ -186,6 +186,9 @@ namespace alibava {
                 // Eta vs TDC time
                 std::string _etaFromClusterVsTime;
 
+                // Neighbours distance vs. its relative charge (wrt. to seed)
+                std::string _neighboursCharge;
+
 		// Eta (seed) vs Cluster size
 		std::string _etaVSClusterSize;
 		

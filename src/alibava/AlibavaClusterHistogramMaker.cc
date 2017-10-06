@@ -76,6 +76,7 @@ AlibavaClusterHistogramMaker::AlibavaClusterHistogramMaker():
     _etaVSCoG("hEta_vs_CoG"),
     _etaVSUCPFA("hEta_vs_UCPFA"),
     _etaFromClusterVsTime("hEtaFromCluster_vs_Time"),
+    _neighboursCharge("hNeighboursCharge"),
     _etaVSClusterSize("hEta_vs_ClusterSize"),
     _etaFromClusterVSClusterSize("hEtaFromCluster_vs_ClusterSize"),
     _clusterSizeVsCoG("hClusterSize_vs_CoG"),
@@ -275,6 +276,7 @@ void AlibavaClusterHistogramMaker::fillListOfHistos()
     addToHistoCheckList_PerChip(_etaVsSNRHistoName);
     addToHistoCheckList_PerChip(_etaFromClusterVsSNRHistoName);
     addToHistoCheckList_PerChip(_etaFromClusterVsTime);
+    addToHistoCheckList_PerChip(_neighboursCharge);
     addToHistoCheckList_PerChip(_timeVsSeedHistoName);
     addToHistoCheckList_PerChip(_signalVsSeedHistoName);
     addToHistoCheckList_PerChip(_etaVSTime);
@@ -471,6 +473,22 @@ void AlibavaClusterHistogramMaker::fillHistos(AlibavaCluster * anAlibavaCluster,
         histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_etaFromClusterVsTime,ichip)]);
         histo2->Fill(time,etaFromCluster);
     }
+
+    // Let's see only for clusters > 2 the distribution of the charge in its 3-first (if have) neighbours
+    for(int kindex = 0; kindex < clusterSize; ++kindex)
+    {
+        // Obtain the channel number (normalized to the seed)
+        const int channel = anAlibavaCluster->getChanNum(kindex)-seedChanNumber;
+        // Not using the seed
+        if(channel == 0)
+        {
+            continue;
+        }
+        histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_neighboursCharge,ichip)]);
+        // Remeber seed is the first element of the cluster
+        histo2->Fill(channel,anAlibavaCluster->getSignal(kindex)/anAlibavaCluster->getSignal(0));
+    }
+
     
     // the Eta (seed) vs. SNR
     histo2 = dynamic_cast<TH2F*>(_rootObjectMap[getHistoNameForChip(_etaVsSNRHistoName,ichip)]);
