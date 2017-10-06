@@ -26,6 +26,7 @@
 
 // lcio includes <.h>
 #include <lcio.h>
+#include <EVENT/LCFloatVec.h>
 #include <UTIL/LCTOOLS.h>
 #include <UTIL/CellIDEncoder.h>
 #include <UTIL/CellIDDecoder.h>
@@ -33,6 +34,10 @@
 #include <IMPL/LCEventImpl.h>
 #include <IMPL/TrackerDataImpl.h>
 #include <IMPL/LCEventImpl.h>
+
+// ROOT includes
+#include "TFile.h"
+#include "TGraphErrors.h"
 
 
 // system includes <>
@@ -51,7 +56,10 @@ using namespace alibava;
 
 AlibavaCrosstalkCorrection::AlibavaCrosstalkCorrection () :
     AlibavaBaseProcessor("AlibavaCrosstalkCorrection"),
-    _b1(0.017)
+    _xtInitialized(false),
+    _f(),
+    _nmax(2),
+    _coefficients_name("")
 {
     // modify processor description
     _description ="AlibavaCrosstalkCorrection corrects the effect of an assymetric "\
@@ -66,14 +74,25 @@ AlibavaCrosstalkCorrection::AlibavaCrosstalkCorrection () :
     // if needed one can change these to optional parameters
     registerProcessorParameter ("NoiseInputFile",
             "The filename where the pedestal and noise values stored",
-            _pedestalFile , string("pedestal.slcio"));
+            _pedestalFile , std::string("pedestal.slcio"));
     registerProcessorParameter ("NoiseCollectionName",
             "Noise collection name, better not to change",
             _noiseCollectionName, std::string ("noise"));
     
-    registerProcessorParameter ("b1",
-            "The first neighbourg coefficient of the assymetric cross-talk",
-            _b1, float (0.017));
+    registerProcessorParameter ("CollectionName",
+            "Name of the collection coefficients, if is not found in the event, the"\
+            " content of the 'f' property is used",
+            _coefficients_name, std::string("xtfactors"));
+    
+    registerProcessorParameter ("f",
+            "The neighbourg coefficients of the assymetric cross-talk, "\
+            "ordered by neighbour distance to the seed",
+            _f, std::vector<float>({0.006}));
+   
+    //int nmax_prov(0);
+    registerProcessorParameter ("MaximumNeighbourgs",
+            "Forces the number of maximum neighbourgs to be considered in the correction",
+            _nmax, int(2));
 }
 
 
@@ -111,20 +130,6 @@ void AlibavaCrosstalkCorrection::init ()
         streamlog_out ( MESSAGE4 ) << "The Global Parameter "
             << ALIBAVA::SKIPMASKEDEVENTS <<" is not set! Masked events will be used!" << std::endl;
     }
-    // Whether to activate or not the noisy channel auto masking
-    streamlog_out(MESSAGE4) << "Noisy channel auto-masking is ";
-    if(Global::parameters->isParameterSet(ALIBAVA::AUTOMASKINGACTIVE))
-    {
-        _isAutoMaskingActive = Global::parameters->getIntVal(ALIBAVA::AUTOMASKINGACTIVE);
-    }
-    streamlog_out(MESSAGE4) << _isAutoMaskingActive;
-
-    if(Global::parameters->isParameterSet(ALIBAVA::AUTOMASKINGCRITERIA))
-    {
-        _autoMaskingCriterium = Global::parameters->getFloatVal(ALIBAVA::AUTOMASKINGCRITERIA);
-    }
-    streamlog_out(MESSAGE4) << " ( if ON, using " << _autoMaskingCriterium 
-        << " sigmas )" << std::endl;
     
     // usually a good idea to
     printParameters ();	
@@ -140,10 +145,7 @@ void AlibavaCrosstalkCorrection::processRunHeader (LCRunHeader * rdr)
     
     // get and set selected chips
     this->setChipSelection(arunHeader->getChipSelection());
-    
-    // set pedestal and noise values
-    this->setPedestals();
-    
+
     // set channels to be used (if it is defined)
     this->setChannelsToBeUsed();	
 	
@@ -161,6 +163,7 @@ void AlibavaCrosstalkCorrection::processEvent (LCEvent * anEvent)
         _numberOfSkippedEvents++;
         return;
     }
+
     
     // As an input collection we get pedestal subtracted alibava data
     // This collection contains AlibavaEvents
@@ -184,6 +187,62 @@ void AlibavaCrosstalkCorrection::processEvent (LCEvent * anEvent)
             << " chips evaluated (currently " << this->getChipSelection().size() << std::endl;
         return;
     }
+    
+    // The cross-talk factors, if were included in the DB, 
+    // therefore obtain them, if were not done before
+    if(!_xtInitialized)
+    {
+        LCCollectionVec * xtColVec=nullptr;
+        try
+        {
+            xtColVec=dynamic_cast<LCCollectionVec*>(alibavaEvent->getCollection(_coefficients_name));
+            // Get the vector of coefficients
+            if(xtColVec->getNumberOfElements() != 1)
+            {
+                streamlog_out(ERROR) << "Unexpected format for the cross-talk " 
+                    << "coeficients '" << _coefficients_name << "'" << std::endl;
+                throw lcio::DataNotAvailableException("");
+            }
+            const EVENT::LCFloatVec * xtfactors = dynamic_cast<EVENT::LCFloatVec*>(xtColVec->getElementAt(0));
+            _f.clear();
+            for(unsigned int i=0; i < xtfactors->size() && static_cast<int>(i) < _nmax ; ++i)
+            {
+                // Remember the cross talk factors are obtained directly
+                // from the difference bewteen left-right, and we are
+                // applying the filter by subtracting to the right channel 
+                // (to compensate back)
+                // Check that they are positive??
+                if( (*xtfactors)[i] > 0)
+                {
+                    // Assuming this is the last acceptable 
+                    // left to right cross-talk
+                    break;
+                }
+                _f.push_back((-1.0)*(*xtfactors)[i]);
+            }
+
+        }
+        catch(lcio::DataNotAvailableException) 
+        {
+            // There is no factors introduced by DB-file, let's
+            // use the property
+            
+            // First time let's if sizes are coherent
+            if(static_cast<int>(_f.size()) < this->_nmax)
+            {
+                streamlog_out(ERROR) << "Requested coefficients: " << this->_nmax 
+                    << " BUT only provided " << _f.size() << std::endl;
+                return;
+            }
+        }
+        // Initialize and dump message first time
+        streamlog_out(MESSAGE) << "Neighbour coefficients for correction: " <<std::endl;
+        for(unsigned int i = 0; i < _f.size(); ++i)
+        {
+            streamlog_out(MESSAGE) << "  [" << i << "-coefficient]:" <<_f[i] << std::endl;
+        }
+        _xtInitialized=true;
+    }
 
     // The ouput data pedestal and common mode corrected
     LCCollectionVec * newColVec = new LCCollectionVec(LCIO::TRACKERDATA);    
@@ -206,11 +265,20 @@ void AlibavaCrosstalkCorrection::processEvent (LCEvent * anEvent)
         TrackerDataImpl * trkdata = dynamic_cast<TrackerDataImpl*>(inputColVec->getElementAt(i));
 
         EVENT::FloatVec newdatavec(trkdata->getChargeValues());
-        // The first channel doesn't change
-        newdatavec[0] = trkdata->getChargeValues()[0];
-        for(int i=1; i < ALIBAVA::NOOFCHANNELS; ++i)
+        // FIR application: y[n] = x[n]+f1*x[n-1]*+f2*x[n-2]+....
+        for(unsigned int  n= 0; n < ALIBAVA::NOOFCHANNELS; ++n)
         {
-            newdatavec[i] = trkdata->getChargeValues()[i]-_b1*trkdata->getChargeValues()[i-1];
+            newdatavec[n] = trkdata->getChargeValues()[n];
+            // Note j=Neighbourg order, j-1: Elements filter factor
+            for(unsigned int j =1; j <= _f.size() &&  j-1 < n ; ++j)
+            {
+                // Not using masked channels to correct 
+                if(this->isMasked(chipnum,n-j))
+                {
+                    continue;
+                }
+                newdatavec[n] -= _f[j-1]*trkdata->getChargeValues()[n-j];
+            }
         }
         // Add it to the LCIO class
         newdataImpl->setChargeValues(newdatavec);

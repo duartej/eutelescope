@@ -22,6 +22,10 @@
 #include <IMPL/LCRunHeaderImpl.h>
 #include <IMPL/TrackerDataImpl.h>
 
+// system
+#include <string>
+#include <vector>
+
 
 namespace alibava 
 {
@@ -103,8 +107,20 @@ namespace alibava
 	    //////////////////////////
 	    
         private:
+            // Whether or not the xt coefficients have 
+            // been retrieved
+            bool _xtInitialized;
+
 	    // The first neighbour coefficient
-	    float _b1;
+            std::vector<float> _f;
+	    
+            // The maximum number of coefficients to use
+            int _nmax;
+
+            // The name of the ROOT file where to find
+            // f coeficients (this has precedence over the
+            // f property)
+            std::string _coefficients_name;
     };
     //! A global instance of the processor
     AlibavaCrosstalkCorrection gAlibavaCrosstalkCorrection;
