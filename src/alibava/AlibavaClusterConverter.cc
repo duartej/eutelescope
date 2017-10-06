@@ -205,7 +205,7 @@ void AlibavaClusterConverter::processEvent (LCEvent * anEvent)
                 eutelPixel.setYCoord( memberChanNum );
             }
 	    eutelPixel.setSignal( memberSignal ); // EUTelGenericSparsePixel::setSignal() gets float
-	    eutelPixel.setTime(0); // there is no time info for channels in Alibava
+	    eutelPixel.setTime(alibavaEvent->getEventTime()); // there is no time info for channels in Alibava-- [JDC use the TDC event time]
 	    eutelPixelCluster->addSparsePixel( new EUTelGenericSparsePixel(eutelPixel) );
         }
 			
