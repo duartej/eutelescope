@@ -280,12 +280,15 @@ void AlibavaCrosstalkCorrection::processEvent (LCEvent * anEvent)
                     continue;
                 }
                 newdatavec[n] -= _f[j-1]*trkdata->getChargeValues()[n-j];
+                // The subtracted charge from the channel n (estimated contribution from
+                // channel n-j), is place back to the channel n-j.
+                // This assures charge conservation
+                newdatavec[n-j] += _f[j-1]*trkdata->getChargeValues()[n-j];
             }
         }
         // Add it to the LCIO class
         newdataImpl->setChargeValues(newdatavec);
         newColVec->push_back(newdataImpl);
-
     } // end of loop ever detectors
     alibavaEvent->addCollection(newColVec, getOutputCollectionName());
 }
