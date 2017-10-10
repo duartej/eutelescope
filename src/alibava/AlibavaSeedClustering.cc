@@ -694,7 +694,7 @@ void AlibavaSeedClustering::bookHistos()
 	
         histoName=getHistoNameForChip(_neighbourgsHistoName,ichip);
         title = "Seed neighbourgs (chip "+to_string(ichip)+string(");Neighbourg distance to Seed; Relative charge to seed;");
-        TH2F * hSeedNeighbourg = new TH2F(histoName.c_str(),title.c_str(),_nNeighbourgs, -0.5, _nNeighbourgs-0.5,200,-0.2,0.2);
+        TH2F * hSeedNeighbourg = new TH2F(histoName.c_str(),title.c_str(),_nNeighbourgs, -0.5, _nNeighbourgs-0.5,200,-0.4,0.4);
         _rootObjectMap.insert(make_pair(histoName, hSeedNeighbourg));
 
     } // end of loop over selected chips
