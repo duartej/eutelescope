@@ -369,6 +369,11 @@ void EUTelTreeCreator::processEvent (LCEvent * event)
         for(unsigned int k = 0 ; k < hitvec.size(); ++k)
         {
             const int sensorID = trkHitDecoder(hitvec[k])["sensorID"];
+
+            // FIXME: be sure that the dutPlanes ID dumped by the gear file are present in 
+            //        the data!!. For instance, do a check at the begining only with a functor
+            //        just when found all the dutPlanes, then change the functor to an do-nothing
+            //        function, 
             const std::string pl_str(std::to_string(sensorID));
             std::string xname("trk_hit_");
             std::string yname("trk_hit_");
