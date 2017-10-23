@@ -514,16 +514,23 @@ float AlibavaSeedClustering::calculateEta(TrackerDataImpl *trkdata, int seedChan
     // if one of the channel is masked, since it will be 
     // set to unrealisticSignal other signal will always 
     // be higher then the masked one.
-    // Eta calculation: chargeOnLeftChannel / (chargeOnLeftChannel + chargeOnRightChannel)
+    // XXX DEPRECATED -> Eta calculation: chargeOnLeftChannel / (chargeOnLeftChannel + chargeOnRightChannel)
+    // This calculation allows to identify the  eta-distribution 
+    // histogram with the real Left and Right position, i.e. A peak at 
+    // zero (left of the histogram) means that most of the charge can be
+    // assigned to the strip of the left and equivalent for the right
+    // Eta calculation: chargeOnRightChannel / (chargeOnLeftChannel + chargeOnRightChannel)
     if( leftSignal > rightSignal) 
     {
         // then seed channel is on the right
-	eta = leftSignal / ( leftSignal + seedSignal );
+	//eta = leftSignal / ( leftSignal + seedSignal ); <-- DEPRECATED
+        eta = seedSignal/(leftSignal+seedSignal);
     }
     else 
     {
         // seed channel is on the left
-	eta = seedSignal / (seedSignal + rightSignal);
+	//eta = seedSignal / (seedSignal + rightSignal); <-- DEPRECATED
+        eta = rightSignal/(seedSignal+rightSignal);
     }
     return eta;	
 }

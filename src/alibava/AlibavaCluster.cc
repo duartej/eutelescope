@@ -140,7 +140,7 @@ float AlibavaCluster::getEta(){
 			rightNeighs += getSignal(imember);
 	}
 	
-	float eta = leftNeighs/(leftNeighs+rightNeighs);
+	float eta = rightNeighs/(leftNeighs+rightNeighs);
 	return eta;
 }
 */
@@ -154,7 +154,7 @@ float AlibavaCluster::getEta()
 float AlibavaCluster::getEtaFromCluster()
 {
     // [1] It would define the postion by subtracting the
-    // right strip  x = X_R - p f(eta)
+    // right strip  x = X_L + p f(eta)
     // In case of clusters > 2, it will use the two higher
     // signal channels
     
@@ -188,7 +188,7 @@ float AlibavaCluster::getEtaFromCluster()
         rightSignal= highestSignal;
     }
 
-    return leftSignal->first/(leftSignal->first+rightSignal->first);
+    return rightSignal->first/(leftSignal->first+rightSignal->first);
 }
 
 void AlibavaCluster::setEta(float eta)
