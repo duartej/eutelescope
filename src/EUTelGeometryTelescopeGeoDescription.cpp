@@ -1228,6 +1228,27 @@ void EUTelGeometryTelescopeGeoDescription::updateSiPlanesLayout() {
                 // JDC, set the ID of the sensor (otherwise when the 
                 // z-order doesn't correspond to the sensor ID order, it'ss a mess
                 siplanesLayerLayout->setID(iPlane,sensorID);
+                // And the sensitive part
+                // Get the index corresponding to the sensorID
+                siplanesLayerLayout->setSensitiveID(iPlane,sensorID);
+		siplanesLayerLayout->setSensitivePositionX(iPlane,siPlaneXPosition(sensorID));
+		siplanesLayerLayout->setSensitivePositionY(iPlane,siPlaneYPosition(sensorID));
+		siplanesLayerLayout->setSensitivePositionZ(iPlane,siPlaneZPosition(sensorID));
+		siplanesLayerLayout->setSensitiveRotation1(iPlane,siPlaneRotation1(sensorID));
+		siplanesLayerLayout->setSensitiveRotation2(iPlane,siPlaneRotation2(sensorID));
+		siplanesLayerLayout->setSensitiveRotation3(iPlane,siPlaneRotation3(sensorID));
+		siplanesLayerLayout->setSensitiveRotation4(iPlane,siPlaneRotation4(sensorID));
+
+		siplanesLayerLayout->setSensitiveSizeX(iPlane, siPlaneXSize(sensorID));
+		siplanesLayerLayout->setSensitiveSizeY(iPlane, siPlaneYSize(sensorID));
+                siplanesLayerLayout->setSensitiveThickness(iPlane,siPlaneZSize(sensorID));
+		siplanesLayerLayout->setSensitiveNpixelX(iPlane,siPlaneXNpixels(sensorID));
+                siplanesLayerLayout->setSensitiveNpixelY(iPlane,siPlaneYNpixels(sensorID));
+                siplanesLayerLayout->setSensitivePitchX(iPlane,siPlaneXPitch(sensorID));
+                siplanesLayerLayout->setSensitivePitchY(iPlane,siPlaneYPitch(sensorID));
+		siplanesLayerLayout->setSensitiveResolutionX(iPlane,siPlaneXResolution(sensorID));
+		siplanesLayerLayout->setSensitiveResolutionY(iPlane,siPlaneYResolution(sensorID));
+		siplanesLayerLayout->setSensitiveRadLength(iPlane,siPlaneRadLength(sensorID));
 	}
 
 
