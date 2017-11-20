@@ -115,14 +115,13 @@ std::string EUTelMille::_residualYvsYLocalname      = "ResidualYvsY";
 std::string EUTelMille::_residualZvsXLocalname      = "ResidualZvsX";
 std::string EUTelMille::_residualZvsYLocalname      = "ResidualZvsY";
 
-
 #endif
 
 
 
 
-EUTelMille::EUTelMille () : Processor("EUTelMille") {
-
+EUTelMille::EUTelMille () : Processor("EUTelMille") 
+{
   //some default values
   FloatVec MinimalResidualsX;
   FloatVec MinimalResidualsY;
@@ -322,159 +321,166 @@ EUTelMille::EUTelMille () : Processor("EUTelMille") {
 
 }
 
-void EUTelMille::init() {
+void EUTelMille::init() 
+{
+    // Getting access to geometry description
+    geo::gGeometry().initializeTGeoDescription(EUTELESCOPE::GEOFILENAME, EUTELESCOPE::DUMPGEOROOT);
+    
+    _sensorIDVec.clear();
+    _sensorIDVecMap.clear();
+    //TODO: get this directly
 
-	// Getting access to geometry description
-	geo::gGeometry().initializeTGeoDescription(EUTELESCOPE::GEOFILENAME, EUTELESCOPE::DUMPGEOROOT);
+    // an associative map for getting also the sensorID ordered
+    std::map< double, int > sensorIDMap;
 
-  _sensorIDVec.clear();
-  _sensorIDVecMap.clear();
-	//TODO: get this directly
-
-  // an associative map for getting also the sensorID ordered
-  map< double, int > sensorIDMap;
-
-  for ( size_t i = 0; i < geo::gGeometry().sensorIDsVec().size(); i++) 
-   {
-	int sensorID = geo::gGeometry().sensorIDsVec().at(i);
+    for( size_t i = 0; i < geo::gGeometry().sensorIDsVec().size(); i++)
+    {
+        int sensorID = geo::gGeometry().sensorIDsVec().at(i);
     	_sensorIDVec.push_back( sensorID );
     	_sensorIDVecMap.insert( make_pair( sensorID, i ) );
     	sensorIDMap.insert( make_pair( geo::gGeometry().siPlaneZPosition(sensorID), sensorID ) );
-   }
+    }
      
-  _histogramSwitch = true;
-  _referenceHitVec = NULL;
-
-  //lets guess the number of planes
-  if(_inputMode == 0 || _inputMode == 2) 
+    _histogramSwitch = true;
+    _referenceHitVec = NULL;
+    
+    //lets guess the number of planes
+    if(_inputMode == 0 || _inputMode == 2) 
     {
+        // the number of planes is got from the GEAR description and is
+        // the sum of the telescope reference planes and the DUT (if
+        // any)
+        _nPlanes = geo::gGeometry().nPlanes();
 
-      // the number of planes is got from the GEAR description and is
-      // the sum of the telescope reference planes and the DUT (if
-      // any)
-      _nPlanes = geo::gGeometry().nPlanes();
-
-      if (_useSensorRectangular.empty()) {
-	      streamlog_out(MESSAGE4) << "No rectangular limits on pixels of sensorplanes applied" << endl;
-      } else {
-	      if (_useSensorRectangular.size() % 5 != 0) {
-		      streamlog_out(WARNING2) << "Wrong number of arguments in RectangularLimits! Ignoring this cut!" << endl;
-	      } else {
-		      streamlog_out(MESSAGE4) << "Reading in SensorRectangularCuts: " << endl;
-		      int sensorcuts = _useSensorRectangular.size()/5;
-		      for (int i = 0; i < sensorcuts; ++i) {
-			      int sensor = _useSensorRectangular.at(5*i+0);
-			      int A = _useSensorRectangular.at(5*i+1);
-			      int B = _useSensorRectangular.at(5*i+2);
-			      int C = _useSensorRectangular.at(5*i+3);
-			      int D = _useSensorRectangular.at(5*i+4);
-			      SensorRectangular r(sensor,A,B,C,D);
-			      r.print();
-			      _rect.addRectangular(r);
-		      }
-	      }
-      } 
-
+        if (_useSensorRectangular.empty()) 
+        {
+            streamlog_out(MESSAGE4) << "No rectangular limits on pixels of sensorplanes applied" << endl;
+        } 
+        else 
+        {
+            if(_useSensorRectangular.size() % 5 != 0) 
+            {
+                streamlog_out(WARNING2) << "Wrong number of arguments in RectangularLimits! Ignoring this cut!" << endl;
+            } 
+            else
+            {
+                streamlog_out(MESSAGE4) << "Reading in SensorRectangularCuts: " << endl;
+                int sensorcuts = _useSensorRectangular.size()/5;
+                for (int i = 0; i < sensorcuts; ++i) 
+                {
+                    int sensor = _useSensorRectangular.at(5*i+0);
+                    int A = _useSensorRectangular.at(5*i+1);
+                    int B = _useSensorRectangular.at(5*i+2);
+                    int C = _useSensorRectangular.at(5*i+3);
+                    int D = _useSensorRectangular.at(5*i+4);
+                    SensorRectangular r(sensor,A,B,C,D);
+                    r.print();
+                    _rect.addRectangular(r);
+                }
+            }
+        }
     }
-  else if(_inputMode == 1)
+    else if(_inputMode == 1)
     {
-      _nPlanes = geo::gGeometry().nPlanes();
+        _nPlanes = geo::gGeometry().nPlanes();
     }
-  else if(_inputMode == 3)
+    else if(_inputMode == 3)
     {
-
-      // the number of planes is got from the GEAR description and is
-      // the sum of the telescope reference planes and the DUT (if
-      // any)
-      _nPlanes = geo::gGeometry().nPlanes();
+        // the number of planes is got from the GEAR description and is
+        // the sum of the telescope reference planes and the DUT (if
+        // any)
+        _nPlanes = geo::gGeometry().nPlanes();
     }
-  else
+    else
     {
-      streamlog_out ( ERROR2 ) << "unknown input mode " << _inputMode << endl;
-      throw InvalidParameterException("unknown input mode");
+        streamlog_out ( ERROR2 ) << "unknown input mode " << _inputMode << endl;
+        throw InvalidParameterException("unknown input mode");
     }
-
-  //the user is giving sensor ids for the planes to be excluded. this
-  //sensor ids have to be converted to a local index according to the
-  //planes positions along the z axis.
-  for (size_t i = 0; i < _FixedPlanes_sensorIDs.size(); i++)
+    //the user is giving sensor ids for the planes to be excluded. this
+    //sensor ids have to be converted to a local index according to the
+    //planes positions along the z axis.
+    for (size_t i = 0; i < _FixedPlanes_sensorIDs.size(); i++)
     {
-      map< double, int >::iterator iter = sensorIDMap.begin();
-      int counter = 0;
-      while ( iter != sensorIDMap.end() ) {
-        if( iter->second == _FixedPlanes_sensorIDs[i])
-          {
-            _FixedPlanes.push_back(counter);
-            break;
-          }
+        std::map< double, int >::iterator iter = sensorIDMap.begin();
+        int counter = 0;
+        while( iter != sensorIDMap.end() ) 
+        {
+            if( iter->second == _FixedPlanes_sensorIDs[i])
+            {
+                _FixedPlanes.push_back(counter);
+                break;
+            }
+            ++iter;
+            ++counter;
+        }
+    }
+    for (size_t i = 0; i < _excludePlanes_sensorIDs.size(); i++)
+    {
+        std::map< double, int >::iterator iter = sensorIDMap.begin();
+        int counter = 0;
+        while ( iter != sensorIDMap.end() ) 
+        {
+            if( iter->second == _excludePlanes_sensorIDs[i])
+            {
+                _excludePlanes.push_back(counter);
+                break;
+            }
+            ++iter;
+            ++counter;
+        }
+    }
+  
+    // strip from the map the sensor id already sorted.
+    std::map< double, int >::iterator iter = sensorIDMap.begin();
+    unsigned int counter = 0;
+    while ( iter != sensorIDMap.end() ) 
+    { 
+        bool excluded = false;
+        for (size_t i = 0; i < _excludePlanes.size(); i++)
+        {
+            if(_excludePlanes[i] == counter)
+            {
+                excluded = true;
+                break;
+            }
+        }
+        if(!excluded)
+        {
+            _orderedSensorID_wo_excluded.push_back( iter->second );
+        }
+        _orderedSensorID.push_back( iter->second );
+        
         ++iter;
         ++counter;
-      }
     }
-  for (size_t i = 0; i < _excludePlanes_sensorIDs.size(); i++)
-    {
-      map< double, int >::iterator iter = sensorIDMap.begin();
-      int counter = 0;
-      while ( iter != sensorIDMap.end() ) {
-        if( iter->second == _excludePlanes_sensorIDs[i])
-          {
-            _excludePlanes.push_back(counter);
-            break;
-          }
-        ++iter;
-        ++counter;
-      }
-    }
+
+    // this method is called only once even when the rewind is active
+    // usually a good idea to
+    printParameters ();
+
+    // set to zero the run and event counters
+    _iRun = 0;
+    _iEvt = 0;
+
+    // Initialize number of excluded planes
+    _nExcludePlanes = _excludePlanes.size();
+
+    streamlog_out(MESSAGE2) << "Number of planes excluded from the alignment fit: " << _nExcludePlanes << endl;
+
+    // Initialise Mille statistics
+    _nMilleDataPoints = 0;
+    _nMilleTracks = 0;
+
+    _waferResidX = new double[_nPlanes];
+    _waferResidY = new double[_nPlanes];
+    _waferResidZ = new double[_nPlanes];
   
-  // strip from the map the sensor id already sorted.
-  map< double, int >::iterator iter = sensorIDMap.begin();
-  unsigned int counter = 0;
-  while ( iter != sensorIDMap.end() ) {
-    bool excluded = false;
-    for (size_t i = 0; i < _excludePlanes.size(); i++)
-      {
-        if(_excludePlanes[i] == counter)
-          {
-            excluded = true;
-            break;
-          }
-      }
-    if(!excluded)
-      _orderedSensorID_wo_excluded.push_back( iter->second );
-    _orderedSensorID.push_back( iter->second );
+    _xFitPos = new double[_nPlanes];
+    _yFitPos = new double[_nPlanes];
 
-    ++iter;
-    ++counter;
-  }
-
-  // this method is called only once even when the rewind is active
-  // usually a good idea to
-  printParameters ();
-
-  // set to zero the run and event counters
-  _iRun = 0;
-  _iEvt = 0;
-
-  // Initialize number of excluded planes
-  _nExcludePlanes = _excludePlanes.size();
-
-  streamlog_out ( MESSAGE2 ) << "Number of planes excluded from the alignment fit: " << _nExcludePlanes << endl;
-
-  // Initialise Mille statistics
-  _nMilleDataPoints = 0;
-  _nMilleTracks = 0;
-
-  _waferResidX = new double[_nPlanes];
-  _waferResidY = new double[_nPlanes];
-  _waferResidZ = new double[_nPlanes];
-  
-  
-  _xFitPos = new double[_nPlanes];
-  _yFitPos = new double[_nPlanes];
-
-  _telescopeResolX = new double[_nPlanes];
-  _telescopeResolY = new double[_nPlanes];
-  _telescopeResolZ = new double[_nPlanes];
+    _telescopeResolX = new double[_nPlanes];
+    _telescopeResolY = new double[_nPlanes];
+    _telescopeResolZ = new double[_nPlanes];
 
   //check the consistency of the resolution parameters
   if(_alignMode == 3)
@@ -997,475 +1003,478 @@ double residYFit[], double angleFit[2]) {
 
 }
 
-void  EUTelMille::FillHotPixelMap(LCEvent *event)
+void EUTelMille::FillHotPixelMap(LCEvent *event)
 {
     LCCollectionVec *hotPixelCollectionVec = 0;
     try 
     {
-      hotPixelCollectionVec = static_cast< LCCollectionVec* > ( event->getCollection( _hotPixelCollectionName  ) );
+        hotPixelCollectionVec = static_cast< LCCollectionVec* > ( event->getCollection( _hotPixelCollectionName  ) );
     }
     catch (...)
     {
-      if (!_hotPixelCollectionName.empty())
-	streamlog_out ( WARNING ) << "_hotPixelCollectionName " << _hotPixelCollectionName.c_str() << " not found" << endl; 
+        if(!_hotPixelCollectionName.empty())
+        {
+            streamlog_out ( WARNING ) << "_hotPixelCollectionName " 
+                << _hotPixelCollectionName.c_str() << " not found" << endl; 
+        }
       return;
     }
 
-        CellIDDecoder<TrackerDataImpl> cellDecoder( hotPixelCollectionVec );
-	
-        for(int i=0; i<  hotPixelCollectionVec->getNumberOfElements(); i++)
-        {
-           TrackerDataImpl* hotPixelData = dynamic_cast< TrackerDataImpl *> ( hotPixelCollectionVec->getElementAt( i ) );
-	   SparsePixelType  type         = static_cast<SparsePixelType> (static_cast<int> (cellDecoder( hotPixelData )["sparsePixelType"]));
-
-	   int sensorID              = static_cast<int > ( cellDecoder( hotPixelData )["sensorID"] );
-
-           if( type  ==  kEUTelGenericSparsePixel ) {  
-				std::unique_ptr<EUTelSparseClusterImpl<EUTelGenericSparsePixel>> m26Data = std::make_unique<EUTelSparseClusterImpl<EUTelGenericSparsePixel>>(hotPixelData);
-
-              std::vector<EUTelGenericSparsePixel*> m26PixelVec;
-	      EUTelGenericSparsePixel m26Pixel;
-  	      //Push all single Pixels of one plane in the m26PixelVec
-
-             for ( unsigned int iPixel = 0; iPixel < m26Data->size(); iPixel++ ) 
-             {
-              IntVec m26ColVec();
-              m26Data->getSparsePixelAt( iPixel, &m26Pixel);
-              streamlog_out ( DEBUG3 ) << iPixel << " of " << m26Data->size() << " HotPixelInfo:  " << m26Pixel.getXCoord() << " " << m26Pixel.getYCoord() << " " << m26Pixel.getSignal() << endl;
-              try
-              {
-                 char ix[100];
-                 sprintf(ix, "%d,%d,%d", sensorID, m26Pixel.getXCoord(), m26Pixel.getYCoord() ); 
-                 _hotPixelMap[ix] = true;             
-              }
-              catch(...)
-              {
-                 std::cout << "can not add pixel " << std::endl;
-                 std::cout << sensorID << " " << m26Pixel.getXCoord() << " " << m26Pixel.getYCoord() << " " << std::endl;   
-              }
-             }
-           }
-       }
-
-}
-
-void  EUTelMille::findMatchedHits(int& _ntrack, Track* TrackHere) {
- 
-      // hit list assigned to track
-      std::vector<EVENT::TrackerHit*> TrackHitsHere = TrackHere->getTrackerHits();
-
-      // check for a hit in every plane
-      streamlog_out ( MESSAGE1 ) << "track " << _ntrack << " has " << TrackHitsHere.size() << " hits " << endl;
-
-      // assume hits are ordered in z! start counting from 0
-      int nPlaneHere = 0;
-
-      // setup cellIdDecoder to decode the hit properties
-      CellIDDecoder<TrackerHit>  hitCellDecoder(EUTELESCOPE::HITENCODING);
-
-
-
-      std::vector <TrackerHit* > hit;
-      std::vector <TrackerHit* > fit;
-
-      // loop over all hits and fill arrays
-      for (int nHits = 0; nHits < int(TrackHitsHere.size()); nHits++) {
-
-          TrackerHit *HitHere = TrackHitsHere.at(nHits);
-          int sensorID = Utility::getSensorIDfromHit ( HitHere ) ;
-
-          // check if this is a measured hit or a fitted hit, want measured hit
-          streamlog_out( MESSAGE0 ) << "hit on plane [" << sensorID << "] properties : " << ( hitCellDecoder(HitHere)["properties"] & kFittedHit ) << std::endl;
-
-          if ( ((hitCellDecoder(HitHere)["properties"] & kFittedHit) >> 1) == 0 ){  hit.push_back(HitHere); }
-
-          if ( ((hitCellDecoder(HitHere)["properties"] & kFittedHit) >> 1) == 1 ){  fit.push_back(HitHere); }
-
-      }
-
-      nPlaneHere = 0;
-
-      for( std::vector<TrackerHit*>::iterator ihit = hit.begin(); ihit!= hit.end(); ihit++){
-         int hitID = Utility::getSensorIDfromHit ( (*ihit) );
-
-         streamlog_out ( MESSAGE1 ) << "hit: @ " << hitID << " " << std::endl;
-
-         for( std::vector<TrackerHit*>::iterator ifit = fit.begin(); ifit!= fit.end(); ifit++){
-             int fitID = Utility::getSensorIDfromHit ( (*ifit) );          
-             streamlog_out ( MESSAGE1 ) << "fit: @ " << fitID << " " << std::endl;
-             if( fitID != hitID ) continue;
-
-             // hit positions
-             const double *hitPosition = (*ihit)->getPosition();
-             const double *fitPosition = (*ifit)->getPosition();
-
-             // fill hits to arrays
-            _xPos[_ntrack][nPlaneHere] = hitPosition[0] * 1000.;
-            _yPos[_ntrack][nPlaneHere] = hitPosition[1] * 1000.;
-            _zPos[_ntrack][nPlaneHere] = hitPosition[2] * 1000.;
-
-            _trackResidX[_ntrack][nPlaneHere] = ( fitPosition[0] - hitPosition[0] ) * 1000. ;
-            _trackResidY[_ntrack][nPlaneHere] = ( fitPosition[1] - hitPosition[1] ) * 1000. ;
-            _trackResidZ[_ntrack][nPlaneHere] = ( fitPosition[2] - hitPosition[2] ) * 1000. ;
-   
-            streamlog_out ( MESSAGE1 ) << "hit: @ " << hitID << " " 
-                          << _xPos[_ntrack][nPlaneHere] << " " 
-                          << _yPos[_ntrack][nPlaneHere] << " " 
-                          << _zPos[_ntrack][nPlaneHere] << " type: " << (*ihit)->getType() ;
-
-            streamlog_out ( MESSAGE1 ) << "res " 
-                         << _trackResidX[_ntrack][nPlaneHere] << " " 
-                         << _trackResidY[_ntrack][nPlaneHere] << " " 
-                         << _trackResidZ[_ntrack][nPlaneHere] ;
-            streamlog_out ( MESSAGE1 ) << endl;
-
-
-            nPlaneHere++;
-             
-
-         }
-      }
-
-      _ntrack++;
-
-}
-
-void EUTelMille::processEvent (LCEvent * event) {
-
-  if ( isFirstEvent() )
-  {
-    FillHotPixelMap(event);
-  }
-
-  CellIDDecoder<TrackerHit>  hitDecoder(EUTELESCOPE::HITENCODING);
-
-  if ( _useReferenceHitCollection ){
-    try {
-    _referenceHitVec = dynamic_cast < LCCollectionVec * > (event->getCollection( _referenceHitCollectionName));
-    }
-    catch (...){
-      streamlog_out ( ERROR5 ) <<  "Reference Hit Collection " << _referenceHitCollectionName.c_str() << " could not be retrieved for event " << event->getEventNumber()<< "! Please check your steering files! " << endl;
-    }
-  }
-  
-  if (_iEvt % 1000 == 0) 
-  {
-    streamlog_out( MESSAGE5 ) << "Currently having " << _nMilleDataPoints << " data points in "
-                              << _nMilleTracks << " tracks " << endl;
-  }
-  
-  if( _nMilleTracks > _maxTrackCandidatesTotal )
-  {
-	return; //throw StopProcessingException(this);
-  }
-  
-  // fill resolution arrays
-  for (size_t help = 0; help < _nPlanes; help++) {
-    _telescopeResolX[help] = _telescopeResolution;
-    _telescopeResolY[help] = _telescopeResolution;
-  }
-
-  EUTelEventImpl * evt = static_cast<EUTelEventImpl*> (event) ;
-
-  if ( evt->getEventType() == kEORE ) {
-    streamlog_out ( DEBUG2 ) << "EORE found: nothing else to do." << endl;
-    return;
-  }
-
-  std::vector<std::vector<EUTelMille::HitsInPlane> > _hitsArray(_nPlanes - _nExcludePlanes, std::vector<EUTelMille::HitsInPlane>());
-  IntVec indexconverter (_nPlanes,-1);
- 
-  std::vector<std::vector<EUTelMille::HitsInPlane> > _allHitsArray(_nPlanes, std::vector<EUTelMille::HitsInPlane>());
-  
-  {
- 
-    
-      int icounter = 0;
-      for(size_t i = 0; i < _nPlanes; i++)
-      {
-          int excluded = 0; //0 - not excluded, 1 - excluded
-          if ( _nExcludePlanes > 0 )
-          {
-              for (int helphelp = 0; helphelp < _nExcludePlanes; helphelp++) {
-                  if (i == _excludePlanes[helphelp] ) {
-                      excluded = 1;
-                      break;//leave the for loop
-                  }
-              }
-          }
-          if(excluded == 1)
-              indexconverter[i] = -1;
-          else
-          {
-              indexconverter[i] = icounter;
-              icounter++;
-          }
-       }
-  }
-
-  if (_inputMode != 1 && _inputMode != 3)
-    for(size_t i =0;i < _hitCollectionName.size();i++)
-      {
-
-        LCCollection* collection;
-        try {
-          collection = event->getCollection(_hitCollectionName[i]);
-        } catch (DataNotAvailableException& e) {
-          streamlog_out ( WARNING2 ) << "No input collection " << _hitCollectionName[i] << " found for event " << event->getEventNumber()
-                                     << " in run " << event->getRunNumber() << endl;
-          throw SkipEventException(this);
-        }
-        int layerIndex = -1;
-        HitsInPlane hitsInPlane;
-
-        // check if running in input mode 0 or 2
-        if (_inputMode == 0) {
-
-          // loop over all hits in collection
-          for ( int iHit = 0; iHit < collection->getNumberOfElements(); iHit++ ) {
-
-            TrackerHitImpl * hit = static_cast<TrackerHitImpl*> ( collection->getElementAt(iHit) );
-             
-	    int localSensorID = hitDecoder(hit)["sensorID"]; 
+    CellIDDecoder<TrackerDataImpl> cellDecoder( hotPixelCollectionVec );
+    for(int i=0; i<  hotPixelCollectionVec->getNumberOfElements(); i++)
+    {
+        TrackerDataImpl* hotPixelData = dynamic_cast< TrackerDataImpl *> ( hotPixelCollectionVec->getElementAt( i ) );
+        SparsePixelType  type         = static_cast<SparsePixelType> (static_cast<int> (cellDecoder( hotPixelData )["sparsePixelType"]));
+        int sensorID              = static_cast<int > ( cellDecoder( hotPixelData )["sensorID"] );
+        if( type  ==  kEUTelGenericSparsePixel ) 
+        {  
+            std::unique_ptr<EUTelSparseClusterImpl<EUTelGenericSparsePixel>> m26Data = std::make_unique<EUTelSparseClusterImpl<EUTelGenericSparsePixel>>(hotPixelData);
+            std::vector<EUTelGenericSparsePixel*> m26PixelVec;
+            EUTelGenericSparsePixel m26Pixel;
+            //Push all single Pixels of one plane in the m26PixelVec
             
-            layerIndex = _sensorIDVecMap[localSensorID] ;
-
-            // Getting positions of the hits.
-            // ------------------------------
-            hitsInPlane.measuredX = 1000. * hit->getPosition()[0];
-            hitsInPlane.measuredY = 1000. * hit->getPosition()[1];
-            hitsInPlane.measuredZ = 1000. * hit->getPosition()[2];
-
-            _allHitsArray[layerIndex].push_back(hitsInPlane);
-          } // end loop over all hits in collection
-
-        } else if (_inputMode == 2) {
-
-          const float resolX = _testModeSensorResolution;
-          const float resolY = _testModeSensorResolution;
-
-          const float xhitpos = gRandom->Uniform(-3500.0,3500.0);
-          const float yhitpos = gRandom->Uniform(-3500.0,3500.0);
-
-          const float xslope = gRandom->Gaus(0.0,_testModeXTrackSlope);
-          const float yslope = gRandom->Gaus(0.0,_testModeYTrackSlope);
-
-          // loop over all planes
-          for (unsigned int help = 0; help < _nPlanes; help++) {
-
-            // The x and y positions are given by the sums of the measured
-            // hit positions, the detector resolution, the shifts of the
-            // planes and the effect due to the track slopes.
-            hitsInPlane.measuredX = xhitpos + gRandom->Gaus(0.0,resolX) + _testModeSensorXShifts[help] + _testModeSensorZPositions[help] * tan(xslope) - _testModeSensorGamma[help] * yhitpos - _testModeSensorBeta[help] * _testModeSensorZPositions[0];
-            hitsInPlane.measuredY = yhitpos + gRandom->Gaus(0.0,resolY) + _testModeSensorYShifts[help] + _testModeSensorZPositions[help] * tan(yslope) + _testModeSensorGamma[help] * xhitpos - _testModeSensorAlpha[help] * _testModeSensorZPositions[help];
-            hitsInPlane.measuredZ = _testModeSensorZPositions[help];
-            if(indexconverter[help] != -1) 
-              _hitsArray[indexconverter[help]].push_back(hitsInPlane);
-	    _hitsArray[help].push_back(hitsInPlane);
-            _telescopeResolX[help] = resolX;
-            _telescopeResolY[help] = resolY;
-          } // end loop over all planes
-
-        } // end if check running in input mode 0 or 2
-
-      }
-
-  int _nTracks = 0;
-
-  int _nGoodTracks = 0;
-
-  // check if running in input mode 0 or 2 => perform simple track finding
-  if (_inputMode == 0 || _inputMode == 2) {
-
-    // Find track candidates using the distance cuts
-    // ---------------------------------------------
-    //
-    // This is done separately for different numbers of planes.
-
-    std::vector<IntVec > indexarray;
-
-    streamlog_out( DEBUG5 ) << "Event #" << _iEvt << std::endl;
-    findtracks2(0, indexarray, IntVec(), _allHitsArray, 0, 0);
-    for(size_t i = 0; i < indexarray.size(); i++)
-      {
-        for(size_t j = 0; j <  _nPlanes; j++)
-          {
-
-             if( _allHitsArray[j].size()>0 &&  indexarray[i][j] >= 0 )
-             {              
-               _xPos[i][j] = _allHitsArray[j][indexarray[i][j]].measuredX;
-               _yPos[i][j] = _allHitsArray[j][indexarray[i][j]].measuredY;
-               _zPos[i][j] = _allHitsArray[j][indexarray[i][j]].measuredZ;
-             }
-             else
-             {
-               _xPos[i][j] = 0.;
-               _yPos[i][j] = 0.;
-               _zPos[i][j] = 0.;
-             }  
-          }
-      }
-
-
-    _nTracks = static_cast< int >(indexarray.size());
-    streamlog_out( DEBUG5 ) << "Track finder found " << _nTracks << std::endl;
-
-    // end check if running in input mode 0 or 2 => perform simple track finding
-  } else if (_inputMode == 1) {
-
-    LCCollection* collection;
-    try {
-      collection = event->getCollection(_trackCollectionName);
-    } catch (DataNotAvailableException& e) {
-      streamlog_out ( WARNING2 ) << "No input track collection " << _trackCollectionName  << " found for event " << event->getEventNumber()
-                                 << " in run " << event->getRunNumber() << endl;
-      throw SkipEventException(this);
-    }
-    const int nTracksHere = collection->getNumberOfElements();
-
-
-    // loop over all tracks
-    for (int nTracksEvent = 0; nTracksEvent < nTracksHere && nTracksEvent < _maxTrackCandidates; nTracksEvent++) {
-
-      Track *TrackHere = dynamic_cast<Track*> (collection->getElementAt(nTracksEvent));
-
-      findMatchedHits( _nTracks, TrackHere );
-
-    } // end loop over all tracks
-
-    streamlog_out ( MESSAGE1 ) << "Number of tracks available in track collection: " << nTracksHere << " tracks selected for Mille: " << _nTracks << std::endl;
-
-  } else if (_inputMode == 3) {
-    LCCollection* collection;
-    try {
-      collection = event->getCollection(_trackCollectionName);
-    } catch (DataNotAvailableException& e) {
-      streamlog_out ( WARNING2 ) << "No input track collection " << _trackCollectionName  << " found for event " << event->getEventNumber()
-                                 << " in run " << event->getRunNumber() << endl;
-      throw SkipEventException(this);
-    }
-    const int nTracksHere = collection->getNumberOfElements();
-    
-    // loop over all tracks
-    for (int nTracksEvent = 0; nTracksEvent < nTracksHere && nTracksEvent < _maxTrackCandidates; nTracksEvent++) {
-
-      Track *TrackHere = dynamic_cast<Track*> (collection->getElementAt(nTracksEvent));
-
-      // hit list assigned to track
-      std::vector<EVENT::TrackerHit*> TrackHitsHere = TrackHere->getTrackerHits();
-
-      size_t number_of_planes = (TrackHitsHere.size() - _excludePlanes.size() )/ 2;
-
-      // check for a hit in every telescope plane. this needs probably
-      // some further investigations. perhaps it fails if some planes
-      // were excluded in the track fitter. but it should work
-      if ((_nPlanes  - _excludePlanes.size())== number_of_planes)
-        {
-          for(size_t i =0;i < _hitCollectionName.size();i++)
-          // check for a hit in every telescope plane
-          {
-              LCCollection* collection;
-              try {
-                collection = event->getCollection(_hitCollectionName[i]);
-              } catch (DataNotAvailableException& e) {
-                streamlog_out ( WARNING2 ) << "No input collection " << _hitCollectionName[i] << " found for event " << event->getEventNumber()
-                                           << " in run " << event->getRunNumber() << endl;
-                throw SkipEventException(this);
-              }
-              for ( int iHit = 0; iHit < collection->getNumberOfElements(); iHit++ )
+            for( unsigned int iPixel = 0; iPixel < m26Data->size(); iPixel++ )
+            {
+                IntVec m26ColVec();
+                m26Data->getSparsePixelAt( iPixel, &m26Pixel);
+                streamlog_out ( DEBUG3 ) << iPixel << " of " 
+                    << m26Data->size() << " HotPixelInfo:  " << m26Pixel.getXCoord() 
+                    << " " << m26Pixel.getYCoord() << " " << m26Pixel.getSignal() << endl;
+                try
                 {
-                  TrackerHitImpl *hit = static_cast<TrackerHitImpl*> ( collection->getElementAt(iHit) );
-
-                  std::vector<EUTelMille::HitsInPlane> hitsplane;
-                  
-		  hitsplane.push_back(
-                          EUTelMille::HitsInPlane(
-                              1000. * hit->getPosition()[0],
-                              1000. * hit->getPosition()[1],
-                              1000. * hit->getPosition()[2]
-                              )
-                          );
- 
-                  double measuredz = hit->getPosition()[2];
-                  streamlog_out( MESSAGE1 ) << " hitsplane : " << hitsplane.size() << " z : " << measuredz << std::endl;
-
-		  // setup cellIdDecoder to decode the hit properties
-		  CellIDDecoder<TrackerHit>  hitCellDecoder(EUTELESCOPE::HITENCODING);
-
-                  for (int nHits = 0; nHits < int(TrackHitsHere.size()); nHits++)  // end loop over all hits and fill arrays
-                  {
-                      TrackerHit *HitHere = TrackHitsHere.at(nHits);
-
-                      // hit positions
-                      const double *PositionsHere = HitHere->getPosition();
- 
-
-                      //the tracker hit will be excluded if the
-                      //distance to the hit from the hit collection
-                      //is larger than 5 mm. this requirement should reject
-                      //reconstructed hits in the DUT in order to
-                      //avoid double counting.
-
-//                      if( std::abs( measuredz - PositionsHere[2] ) > 5.0 /* mm */)
-                        {
-			  // test if this is a fitted hit
-                          streamlog_out( MESSAGE0 ) << "fit hit properties : " << ( hitCellDecoder(HitHere)["properties"] & kFittedHit ) << std::endl;
-
-                          if ( (hitCellDecoder(HitHere)["properties"] & kFittedHit) > 0 )
-                            {
-                              hitsplane.push_back(
-                                      EUTelMille::HitsInPlane(
-                                          PositionsHere[0] * 1000.,
-                                          PositionsHere[1] * 1000.,
-                                          PositionsHere[2] * 1000.
-                                          )
-                                      );
-                            } //fitted hit
-                        }
-                    }
-                  //sort the array such that the hits are ordered
-                  //in z assuming that z is constant over all
-                  //events for each plane
-                  std::sort(hitsplane.begin(), hitsplane.end());
-                          
-          
-                  //now the array is filled into the track
-                  //candidates array
-                  for(size_t i = 0; i < _nPlanes; i++)
-                    {
-                      _xPos[_nTracks][i] = hitsplane[i].measuredX;
-                      _yPos[_nTracks][i] = hitsplane[i].measuredY;
-                      _zPos[_nTracks][i] = hitsplane[i].measuredZ;
-                    }
-                  _nTracks++; //and we found an additional track candidate.
+                    char ix[100];
+                    sprintf(ix, "%d,%d,%d", sensorID, m26Pixel.getXCoord(), m26Pixel.getYCoord() ); 
+                    _hotPixelMap[ix] = true;             
+                }
+                catch(...)
+                {
+                    std::cout << "can not add pixel " << std::endl;
+                    std::cout << sensorID << " " << m26Pixel.getXCoord() << " " << m26Pixel.getYCoord() << " " << std::endl;   
                 }
             }
-          //end of the loop
-        } else {
+        }
+    }
+}
 
-        streamlog_out ( MESSAGE1 ) << "Dropping track " << nTracksEvent << " because there is not a hit in every plane assigned to it." << endl;
-      }
+void  EUTelMille::findMatchedHits(int& _ntrack, Track* TrackHere) 
+{
+    // hit list assigned to track
+    std::vector<EVENT::TrackerHit*> TrackHitsHere = TrackHere->getTrackerHits();
 
-    } // end loop over all tracks
+    // check for a hit in every plane
+    streamlog_out ( MESSAGE1 ) << "track " << _ntrack << " has " << TrackHitsHere.size() << " hits " << endl;
 
-  }
+    // assume hits are ordered in z! start counting from 0
+    int nPlaneHere = 0;
 
-  if( _inputMode != 1 ) {
-    streamlog_out ( MESSAGE1 ) << "Number of hits in the individual planes: ";
-    for(size_t i = 0; i < _allHitsArray.size(); i++)
-      streamlog_out ( MESSAGE1 ) << _allHitsArray[i].size() << " ";
-    streamlog_out ( MESSAGE1 ) << endl;
-  }
+    // setup cellIdDecoder to decode the hit properties
+    CellIDDecoder<TrackerHit>  hitCellDecoder(EUTELESCOPE::HITENCODING);
 
-  streamlog_out ( MESSAGE1 ) << "Number of track candidates found at: " << _iEvt << ": " << _nTracks << endl;
 
-  // Perform fit for all found track candidates
-  // ------------------------------------------
 
-  // only one track or no single track event
-//  if (_nTracks == 1 || _onlySingleTrackEvents == 0) 
-  {
+    std::vector <TrackerHit* > hit;
+    std::vector <TrackerHit* > fit;
 
+    // loop over all hits and fill arrays
+    for (int nHits = 0; nHits < int(TrackHitsHere.size()); nHits++) {
+
+        TrackerHit *HitHere = TrackHitsHere.at(nHits);
+        int sensorID = Utility::getSensorIDfromHit ( HitHere ) ;
+
+        // check if this is a measured hit or a fitted hit, want measured hit
+        streamlog_out( MESSAGE0 ) << "hit on plane [" << sensorID << "] properties : " << ( hitCellDecoder(HitHere)["properties"] & kFittedHit ) << std::endl;
+
+        if ( ((hitCellDecoder(HitHere)["properties"] & kFittedHit) >> 1) == 0 ){  hit.push_back(HitHere); }
+
+        if ( ((hitCellDecoder(HitHere)["properties"] & kFittedHit) >> 1) == 1 ){  fit.push_back(HitHere); }
+
+    }
+
+    nPlaneHere = 0;
+
+    for( std::vector<TrackerHit*>::iterator ihit = hit.begin(); ihit!= hit.end(); ihit++){
+       int hitID = Utility::getSensorIDfromHit ( (*ihit) );
+
+       streamlog_out ( MESSAGE1 ) << "hit: @ " << hitID << " " << std::endl;
+
+       for( std::vector<TrackerHit*>::iterator ifit = fit.begin(); ifit!= fit.end(); ifit++){
+           int fitID = Utility::getSensorIDfromHit ( (*ifit) );          
+           streamlog_out ( MESSAGE1 ) << "fit: @ " << fitID << " " << std::endl;
+           if( fitID != hitID ) continue;
+
+           // hit positions
+           const double *hitPosition = (*ihit)->getPosition();
+           const double *fitPosition = (*ifit)->getPosition();
+
+           // fill hits to arrays
+          _xPos[_ntrack][nPlaneHere] = hitPosition[0] * 1000.;
+          _yPos[_ntrack][nPlaneHere] = hitPosition[1] * 1000.;
+          _zPos[_ntrack][nPlaneHere] = hitPosition[2] * 1000.;
+
+          _trackResidX[_ntrack][nPlaneHere] = ( fitPosition[0] - hitPosition[0] ) * 1000. ;
+          _trackResidY[_ntrack][nPlaneHere] = ( fitPosition[1] - hitPosition[1] ) * 1000. ;
+          _trackResidZ[_ntrack][nPlaneHere] = ( fitPosition[2] - hitPosition[2] ) * 1000. ;
+   
+          streamlog_out ( MESSAGE1 ) << "hit: @ " << hitID << " " 
+                        << _xPos[_ntrack][nPlaneHere] << " " 
+                        << _yPos[_ntrack][nPlaneHere] << " " 
+                        << _zPos[_ntrack][nPlaneHere] << " type: " << (*ihit)->getType() ;
+
+          streamlog_out ( MESSAGE1 ) << "res " 
+                       << _trackResidX[_ntrack][nPlaneHere] << " " 
+                       << _trackResidY[_ntrack][nPlaneHere] << " " 
+                       << _trackResidZ[_ntrack][nPlaneHere] ;
+          streamlog_out ( MESSAGE1 ) << endl;
+
+
+          nPlaneHere++;
+           
+
+       }
+    }
+
+    _ntrack++;
+
+}
+
+void EUTelMille::processEvent (LCEvent * event) 
+{
+    if( isFirstEvent() )
+    {
+        FillHotPixelMap(event);
+    }
+
+    CellIDDecoder<TrackerHit>  hitDecoder(EUTELESCOPE::HITENCODING);
+    
+    if( _useReferenceHitCollection )
+    {
+        try
+        {
+            _referenceHitVec = dynamic_cast < LCCollectionVec * > (event->getCollection( _referenceHitCollectionName));
+        }
+        catch (...)
+        {
+            streamlog_out ( ERROR5 ) <<  "Reference Hit Collection " 
+                << _referenceHitCollectionName.c_str() << " could not be retrieved for event " 
+                << event->getEventNumber()<< "! Please check your steering files! " << std::endl;
+        }
+    }
+    
+    if(_iEvt % 1000 == 0) 
+    {
+        streamlog_out(MESSAGE5) << "Currently having " << _nMilleDataPoints 
+            << " data points in " << _nMilleTracks << " tracks " << std::endl;
+    }
+    
+    if(_nMilleTracks > _maxTrackCandidatesTotal )
+    {
+        return; 
+    }
+    
+    // fill resolution arrays (JDC: wHY do it every event, can be done 
+    // once, check if the arrays (better use vectors) are empty if not fill them
+    for(size_t i_plane = 0; i_plane < _nPlanes; ++i_plane) 
+    {
+        _telescopeResolX[i_plane] = _telescopeResolution;
+        _telescopeResolY[i_plane] = _telescopeResolution;
+    }
+    
+    EUTelEventImpl * evt = static_cast<EUTelEventImpl*> (event);
+    
+    if( evt->getEventType() == kEORE ) 
+    {
+        streamlog_out ( DEBUG2 ) << "EORE found: nothing else to do." << endl;
+        return;
+    }
+
+    std::vector<std::vector<EUTelMille::HitsInPlane> > hitsArray(_nPlanes - _nExcludePlanes, std::vector<EUTelMille::HitsInPlane>());
+    IntVec indexconverter(_nPlanes,-1);
+    std::vector<std::vector<EUTelMille::HitsInPlane> > allHitsArray(_nPlanes, std::vector<EUTelMille::HitsInPlane>());
+    
+    // -- [ JDC: very ugly code to tag an excluded plane ]
+    int icounter = 0;
+    for(size_t i = 0; i < _nPlanes; ++i)
+    {
+        int excluded = 0; //0 - not excluded, 1 - excluded
+        if( _nExcludePlanes > 0 )
+        {
+            for(int helphelp = 0; helphelp < _nExcludePlanes; helphelp++) 
+            {
+                if (i == _excludePlanes[helphelp] ) 
+                {
+                    excluded = 1;
+                    break;//leave the for loop
+                }
+            }
+        }
+        if(excluded == 1)
+        {
+            indexconverter[i] = -1;
+        }
+        else
+        {
+            indexconverter[i] = icounter;
+            icounter++;
+        }
+    }
+  
+    // -- > CREATE A FUNCTION .... 
+    int _nTracks = 0;
+    int _nGoodTracks = 0;
+
+    // The tracks are reconstructed on-the-fly
+    if(_inputMode == 0 || _inputMode == 2)
+    {
+        // --- Hits obtention
+        for(size_t i =0;i < _hitCollectionName.size();++i)
+        {
+            LCCollection* collection = nullptr;
+            try 
+            {
+                collection = event->getCollection(_hitCollectionName[i]);
+            } 
+            catch (DataNotAvailableException& e) 
+            {
+                streamlog_out ( WARNING2 ) << "No input collection " << _hitCollectionName[i] << " found for event " << event->getEventNumber()
+                    << " in run " << event->getRunNumber() << endl;
+                throw SkipEventException(this);
+            }
+            int layerIndex = -1;
+            HitsInPlane hitsInPlane;
+            
+            // Hists obtained from the input file
+            if(_inputMode == 0) 
+            {
+                // loop over all hits in collection
+                for( int iHit = 0; iHit < collection->getNumberOfElements(); ++iHit ) 
+                {
+                    TrackerHitImpl * hit = static_cast<TrackerHitImpl*> ( collection->getElementAt(iHit) );
+                    int localSensorID = hitDecoder(hit)["sensorID"]; 
+                    layerIndex = _sensorIDVecMap[localSensorID] ;
+                    // Getting positions of the hits. [ Note the positions are converted in Microns ]
+                    // ------------------------------
+                    hitsInPlane.measuredX = 1000. * hit->getPosition()[0]; 
+                    hitsInPlane.measuredY = 1000. * hit->getPosition()[1];
+                    hitsInPlane.measuredZ = 1000. * hit->getPosition()[2];
+                    
+                    allHitsArray[layerIndex].push_back(hitsInPlane);
+                } // end loop over all hits in collection
+            } 
+            // a simulation is performed to produce the hits
+            else if(_inputMode == 2) 
+            {
+                const float resolX = _testModeSensorResolution;
+                const float resolY = _testModeSensorResolution;
+                
+                const float xhitpos = gRandom->Uniform(-3500.0,3500.0);
+                const float yhitpos = gRandom->Uniform(-3500.0,3500.0);
+                
+                const float xslope = gRandom->Gaus(0.0,_testModeXTrackSlope);
+                const float yslope = gRandom->Gaus(0.0,_testModeYTrackSlope);
+                
+                // loop over all planes
+                for (unsigned int help = 0; help < _nPlanes; help++) 
+                {
+                    // The x and y positions are given by the sums of the measured
+                    // hit positions, the detector resolution, the shifts of the
+                    // planes and the effect due to the track slopes.
+                    hitsInPlane.measuredX = xhitpos + gRandom->Gaus(0.0,resolX) 
+                        + _testModeSensorXShifts[help] 
+                        + _testModeSensorZPositions[help] * tan(xslope) 
+                        - _testModeSensorGamma[help] * yhitpos - _testModeSensorBeta[help] * _testModeSensorZPositions[0];
+                    hitsInPlane.measuredY = yhitpos + gRandom->Gaus(0.0,resolY) 
+                        + _testModeSensorYShifts[help] + _testModeSensorZPositions[help] * tan(yslope) 
+                        + _testModeSensorGamma[help] * xhitpos - _testModeSensorAlpha[help] * _testModeSensorZPositions[help];
+                    hitsInPlane.measuredZ = _testModeSensorZPositions[help];
+                    if(indexconverter[help] != -1) 
+                    {
+                        hitsArray[indexconverter[help]].push_back(hitsInPlane);
+                    }
+                    hitsArray[help].push_back(hitsInPlane);
+                    _telescopeResolX[help] = resolX;
+                    _telescopeResolY[help] = resolY;
+                } // end loop over all planes
+            } // end if check running in input mode 0 or 2
+        }
+        
+        // Find track candidates using the distance cuts
+        // ---------------------------------------------
+        //
+        // This is done separately for different numbers of planes.
+        std::vector<IntVec > indexarray;
+        streamlog_out( DEBUG5 ) << "Event #" << _iEvt << std::endl;
+        findtracks2(0, indexarray, IntVec(), allHitsArray, 0, 0);
+        for(size_t i = 0; i < indexarray.size(); ++i)
+        {
+            for(size_t j = 0; j <  _nPlanes; ++j)
+            {
+                if(allHitsArray[j].size()>0 &&  indexarray[i][j] >= 0 )
+                {              
+                    _xPos[i][j] = allHitsArray[j][indexarray[i][j]].measuredX;
+                    _yPos[i][j] = allHitsArray[j][indexarray[i][j]].measuredY;
+                    _zPos[i][j] = allHitsArray[j][indexarray[i][j]].measuredZ;
+                }
+                else
+                {
+                    _xPos[i][j] = 0.;
+                    _yPos[i][j] = 0.;
+                    _zPos[i][j] = 0.;
+                }  
+            }
+        }
+        
+        _nTracks = static_cast< int >(indexarray.size());
+        streamlog_out( DEBUG5 ) << "Track finder found " << _nTracks << std::endl;
+    }
+    // Get the hits from the externally calculated tracks
+    else if (_inputMode == 1) 
+    {
+        LCCollection* collection = nullptr;
+        try {
+            collection = event->getCollection(_trackCollectionName);
+        } 
+        catch (DataNotAvailableException& e) 
+        { 
+            streamlog_out ( WARNING2 ) << "No input track collection " << _trackCollectionName  
+                << " found for event " << event->getEventNumber()
+                << " in run " << event->getRunNumber() << endl;
+            throw SkipEventException(this);
+        }
+        const int nTracksHere = collection->getNumberOfElements();
+        // loop over all tracks
+        for(int nTracksEvent = 0; nTracksEvent < nTracksHere && nTracksEvent < _maxTrackCandidates; ++nTracksEvent) 
+        {
+            Track *TrackHere = dynamic_cast<Track*> (collection->getElementAt(nTracksEvent));
+            findMatchedHits( _nTracks, TrackHere );
+        } // end loop over all tracks
+        
+        streamlog_out ( MESSAGE1 ) << "Number of tracks available in track collection: " 
+            << nTracksHere << " tracks selected for Mille: " << _nTracks << std::endl;
+    } 
+    // Get the hits from the externally calculated tracks
+    else if (_inputMode == 3) 
+    {
+        LCCollection* collection = nullptr;
+        try 
+        {
+            collection = event->getCollection(_trackCollectionName);
+        } 
+        catch (DataNotAvailableException& e) 
+        {
+            streamlog_out ( WARNING2 ) << "No input track collection " << _trackCollectionName  << " found for event " << event->getEventNumber()
+                                 << " in run " << event->getRunNumber() << endl;
+            throw SkipEventException(this);
+        }
+        const int nTracksHere = collection->getNumberOfElements();
+    
+        // loop over all tracks
+        for(int nTracksEvent = 0; nTracksEvent < nTracksHere && nTracksEvent < _maxTrackCandidates; nTracksEvent++) 
+        {
+            Track *TrackHere = dynamic_cast<Track*> (collection->getElementAt(nTracksEvent));
+            // hit list assigned to track
+            std::vector<EVENT::TrackerHit*> TrackHitsHere = TrackHere->getTrackerHits();
+            size_t number_of_planes = (TrackHitsHere.size() - _excludePlanes.size() )/ 2;
+            // check for a hit in every telescope plane. this needs probably
+            // some further investigations. perhaps it fails if some planes
+            // were excluded in the track fitter. but it should work
+            if((_nPlanes  - _excludePlanes.size())== number_of_planes)
+            {
+                for(size_t i =0;i < _hitCollectionName.size();i++)
+                // check for a hit in every telescope plane
+                {
+                    LCCollection* collection = nullptr;
+                    try 
+                    {
+                        collection = event->getCollection(_hitCollectionName[i]);
+                    } 
+                    catch (DataNotAvailableException& e) 
+                    { 
+                        streamlog_out ( WARNING2 ) << "No input collection " << _hitCollectionName[i] << " found for event " << event->getEventNumber()
+                            << " in run " << event->getRunNumber() << endl;
+                        throw SkipEventException(this);
+                    }
+                    for( int iHit = 0; iHit < collection->getNumberOfElements(); iHit++ )
+                    {
+                        TrackerHitImpl *hit = static_cast<TrackerHitImpl*> ( collection->getElementAt(iHit) );
+                        
+                        std::vector<EUTelMille::HitsInPlane> hitsplane;
+
+        		hitsplane.push_back(
+                                EUTelMille::HitsInPlane(
+                                    1000. * hit->getPosition()[0],
+                                    1000. * hit->getPosition()[1],
+                                    1000. * hit->getPosition()[2]
+                                    ) );
+                        double measuredz = hit->getPosition()[2];
+                        streamlog_out( MESSAGE1 ) << " hitsplane : " << hitsplane.size() << " z : " << measuredz << std::endl;
+
+		        // setup cellIdDecoder to decode the hit properties
+                        CellIDDecoder<TrackerHit>  hitCellDecoder(EUTELESCOPE::HITENCODING);
+                        for(int nHits = 0; nHits < int(TrackHitsHere.size()); nHits++)  // end loop over all hits and fill arrays
+                        {
+                            TrackerHit *HitHere = TrackHitsHere.at(nHits);
+                            
+                            // hit positions
+                            const double *PositionsHere = HitHere->getPosition();
+                            
+                            //the tracker hit will be excluded if the
+                            //distance to the hit from the hit collection
+                            //is larger than 5 mm. this requirement should reject
+                            //reconstructed hits in the DUT in order to
+                            //avoid double counting.
+
+			    // test if this is a fitted hit
+                            streamlog_out( MESSAGE0 ) << "fit hit properties : " << ( hitCellDecoder(HitHere)["properties"] & kFittedHit ) << std::endl;
+
+                            if ( (hitCellDecoder(HitHere)["properties"] & kFittedHit) > 0 )
+                            {
+                                hitsplane.push_back(
+                                        EUTelMille::HitsInPlane(
+                                            PositionsHere[0] * 1000.,
+                                            PositionsHere[1] * 1000.,
+                                            PositionsHere[2] * 1000.
+                                            )
+                                        );
+                            } //fitted hit
+                        }
+                        //sort the array such that the hits are ordered
+                        //in z assuming that z is constant over all
+                        //events for each plane
+                        std::sort(hitsplane.begin(), hitsplane.end());
+                        
+                        //now the array is filled into the track
+                        //candidates array
+                        for(size_t i = 0; i < _nPlanes; i++)
+                        {
+                            _xPos[_nTracks][i] = hitsplane[i].measuredX;
+                            _yPos[_nTracks][i] = hitsplane[i].measuredY;
+                            _zPos[_nTracks][i] = hitsplane[i].measuredZ;
+                        }
+                        _nTracks++; //and we found an additional track candidate.
+                    }
+                }
+                //end of the loop
+                } 
+            else 
+            {
+                streamlog_out ( MESSAGE1 ) << "Dropping track " << nTracksEvent << " because there is not a hit in every plane assigned to it." << endl;
+            }
+        } // end loop over all tracks
+    }
+
+    if( _inputMode != 1 ) 
+    {
+        streamlog_out ( MESSAGE1 ) << "Number of hits in the individual planes: ";
+        for(size_t i = 0; i < allHitsArray.size(); i++)
+            streamlog_out ( MESSAGE1 ) << allHitsArray[i].size() << " ";
+        streamlog_out ( MESSAGE1 ) << endl;
+    }
+
+    streamlog_out ( MESSAGE1 ) << "Number of track candidates found at: " << _iEvt << ": " << _nTracks << endl;
+    // -- > CREATE A FUNCTION .... get_track_candidates (with its hits)
+    //
+    // Perform fit for all found track candidates
+    // ------------------------------------------
     DoubleVec lambda;
     lambda.reserve(_nPlanes);
     bool validminuittrack = false;
@@ -1474,274 +1483,256 @@ void EUTelMille::processEvent (LCEvent * event) {
     double angle[2] = {0,0};
 
     // loop over all track candidates
-    for (int track = 0; track < _nTracks; track++) {
-
-      _xPosHere = new double[_nPlanes];
-      _yPosHere = new double[_nPlanes];
-      _zPosHere = new double[_nPlanes];
-
-
-      for (unsigned int help = 0; help < _nPlanes; help++) {
-        _xPosHere[help] = _xPos[track][help];
-        _yPosHere[help] = _yPos[track][help];
-        _zPosHere[help] = _zPos[track][help];
-
-        if( _inputMode == 1 ) {
-          _waferResidX[help] = _trackResidX[track][help];
-          _waferResidY[help] = _trackResidY[track][help];
-          _waferResidZ[help] = _trackResidZ[track][help];
-        } 
-      }
-
-      Chiquare[0] = 0.0;
-      Chiquare[1] = 0.0;
-
-      streamlog_out ( MESSAGE1 ) << "Adding track using the following coordinates: ";
-
-      // loop over all planes
-      for (unsigned int help = 0; help < _nPlanes; help++) 
-      {
-        int excluded = 0;
-
-        // check if actual plane is excluded
-        if (_nExcludePlanes > 0) {
-          for (int helphelp = 0; helphelp < _nExcludePlanes; helphelp++) {
-            if (help == _excludePlanes[helphelp]) {
-              excluded = 1;
-            }
-          }
-        }
-
-        if (excluded == 0) {
-          streamlog_out ( MESSAGE1 ) << 
-                std::endl << " not Excluded @ " << help  << "["<<_nPlanes << "] " <<_xPosHere[help] << " " << _yPosHere[help] << " " << _zPosHere[help] ;
-        }
-        streamlog_out ( MESSAGE1 ) << std::endl;
-
-      } // end loop over all planes
-
-      streamlog_out ( MESSAGE1 ) << endl;
+    for (int track = 0; track < _nTracks; ++track) 
+    {
+        _xPosHere = new double[_nPlanes];
+        _yPosHere = new double[_nPlanes];
+        _zPosHere = new double[_nPlanes];
      
-//    if( _inputMode == 1 ) {
-//    }else
-      { 
-      if(_alignMode == 3)
+        Chiquare[0] = 0.0;
+        Chiquare[1] = 0.0;
+        
+        // Fill the measured hits for each plane for the current track
+        for(unsigned int help = 0; help < _nPlanes; ++help) 
         {
-          streamlog_out(MESSAGE1) << " AlignMode = " << _alignMode << " _inputMode = " << _inputMode << std::endl;
-
-          //use minuit to find tracks
-          size_t mean_n = 0  ;
-          double mean_x = 0.0;
-          double mean_y = 0.0;
-          double mean_z = 0.0;
-          int index_hitsarray=0;
-          double x0 = -1.;
-          double y0 = -1.;
-          //double z0 = -1.;
-          for (unsigned int help = 0; help < _nPlanes; help++) 
-          {
-            bool excluded = false;
+            _xPosHere[help] = _xPos[track][help];
+            _yPosHere[help] = _yPos[track][help];
+            _zPosHere[help] = _zPos[track][help];
+            
+            if(_inputMode == 1 ) 
+            {
+                _waferResidX[help] = _trackResidX[track][help];
+                _waferResidY[help] = _trackResidY[track][help];
+                _waferResidZ[help] = _trackResidZ[track][help];
+            } 
+        }
+        streamlog_out ( MESSAGE1 ) << "Adding track using the following coordinates: ";
+        // loop over all planes
+        for (unsigned int help = 0; help < _nPlanes; help++) 
+        {
+            int excluded = 0;
             // check if actual plane is excluded
-            if (_nExcludePlanes > 0) 
+            if(_nExcludePlanes > 0) 
             {
-              for (int helphelp = 0; helphelp < _nExcludePlanes; helphelp++) 
-              {
-                if (help == _excludePlanes[helphelp]) 
+                for(int helphelp = 0; helphelp < _nExcludePlanes; helphelp++) 
                 {
-                  excluded = true;
+                    if(help == _excludePlanes[helphelp]) 
+                    {
+                        excluded = 1;
+                    }
                 }
-              }
             }
-            const double x = _xPos[track][help];
-            const double y = _yPos[track][help];
-            const double z = _zPos[track][help];
-            if( abs(x)>1e-06 && abs(y)>1e-06  )
+            
+            if(excluded == 0) 
             {
-              x0 = _xPos[track][help];
-              y0 = _yPos[track][help];
-              //z0 = _zPos[track][help];
+                streamlog_out ( MESSAGE1 ) <<
+                    std::endl << " not Excluded @ " << help  
+                    << "["<<_nPlanes << "] " <<_xPosHere[help] << " " 
+                    << _yPosHere[help] << " " << _zPosHere[help] ;
             }
-            const double xresid = x0 - x;
-            const double yresid = y0 - y;
-            streamlog_out ( MESSAGE1 ) << " x0 = " << x0 << " x= " << x << " ;; y0 = " << y0 << " y = " << y << std::endl;
+            streamlog_out ( MESSAGE1 ) << std::endl;
+        } // end loop over all planes
+        streamlog_out ( MESSAGE1 ) << endl;
 
-            if ( xresid < _residualsXMin[help] || xresid > _residualsXMax[help]) 
-              {
-                continue;
-              }
-            if ( yresid < _residualsYMin[help] || yresid > _residualsYMax[help]) 
-              {
-                continue;
-              }
- 
-            if(!excluded)
-              {
-                double sigmax  = _resolutionX[help];
-                double sigmay  = _resolutionY[help];
-                double sigmaz  = _resolutionZ[help];
-                  
-                if( !( abs(x)<1e-06 && abs(y)<1e-06) )
+        if(_alignMode == 3)
+        {
+            streamlog_out(MESSAGE1) << " AlignMode = " << _alignMode << " _inputMode = " << _inputMode << std::endl;
+            //use minuit to find tracks
+            size_t mean_n = 0  ;
+            double mean_x = 0.0;
+            double mean_y = 0.0;
+            double mean_z = 0.0;
+            int index_hitsarray=0;
+            double x0 = -1.;
+            double y0 = -1.;
+            //double z0 = -1.;
+            for(unsigned int help = 0; help < _nPlanes; help++) 
+            {
+                bool excluded = false;
+                // check if actual plane is excluded
+                if(_nExcludePlanes > 0) 
                 {
-                  mean_z += z;
-                  mean_x += x;
-                  mean_y += y;
-                  mean_n++;  
-                } 
-
-                if( abs(x)<1e-06 && abs(y)<1e-06  )
-                {
-                  sigmax = 1000000.;
-                  sigmay = 1000000.;
-                  sigmaz = 1000000.;
+                    for(int helphelp = 0; helphelp < _nExcludePlanes; helphelp++) 
+                    {
+                        if (help == _excludePlanes[helphelp]) 
+                        {
+                            excluded = true;
+                        }
+                    }
                 }
+                const double x = _xPos[track][help];
+                const double y = _yPos[track][help];
+                const double z = _zPos[track][help];
+                // Not allowed values at zero, why? It is assumed that the beam is
+                // centered around zero, but... 
+                if( abs(x)>1e-06 && abs(y)>1e-06  )
+                {
+                    x0 = _xPos[track][help];
+                    y0 = _yPos[track][help];
+                    //z0 = _zPos[track][help];
+                }
+                const double xresid = x0 - x;
+                const double yresid = y0 - y;
+                streamlog_out ( MESSAGE1 ) << " x0 = " << x0 << " x= " << x << " ;; y0 = " << y0 << " y = " << y << std::endl;
 
-                hitsarray[index_hitsarray] = (hit(
-                                                  x, y, z,
-                                                  sigmax, sigmay, sigmaz,
-                                                  help
-                                                  ));
-                
-                index_hitsarray++;
-              }
-          }
-          mean_z = mean_z / static_cast< double >(mean_n);
-          mean_x = mean_x / static_cast< double >(mean_n);
-          mean_y = mean_y / static_cast< double >(mean_n);
-	  
-          int diff_mean = _nPlanes - mean_n;
-          streamlog_out( MESSAGE0 ) << " diff_mean: " << diff_mean << " _nPlanes = " << _nPlanes << " mean_n = " << mean_n << std::endl;
-
-          if( diff_mean > getAllowedMissingHits() ) 
-          {
-             continue;
-          }
-
-          static bool firstminuitcall = true;
-          
-          if(firstminuitcall)
-          {
-              gSystem->Load("libMinuit");//is this really needed?
-              firstminuitcall = false;
-          }          
-          TMinuit *gMinuit = new TMinuit(4);  //initialize TMinuit with a maximum of 4 params
-          
-          //  set print level (-1 = quiet, 0 = normal, 1 = verbose)
-          gMinuit->SetPrintLevel(-1);
-  
-          gMinuit->SetFCN(fcn_wrapper);
-          
-          double arglist[10];
-          int ierflg = 0;
-
-   
-          // minimization strategy (1 = standard, 2 = slower)
-          arglist[0] = 2;
-          gMinuit->mnexcm("SET STR",arglist,2,ierflg);
-          
-          // set error definition (1 = for chi square)
-          arglist[0] = 1;
-          gMinuit->mnexcm("SET ERR",arglist,1,ierflg);
-          
-          //analytic track fit to guess the starting parameters
-          double sxx = 0.0;
-          double syy = 0.0;
-          double szz = 0.0;
-            
-          double szx = 0.0;
-          double szy = 0.0;
-            
-          for(size_t i = 0; i< number_of_datapoints; i++)
-          {
-            const double x = hitsarray[i].x;
-            const double y = hitsarray[i].y;
-            const double z = hitsarray[i].z;
-            if( !(abs(x)<1e-06 && abs(y)<1e-06) )
-            {
-              sxx += pow(x-mean_x,2);
-              syy += pow(y-mean_y,2);
-              szz += pow(z-mean_z,2);
-            
-              szx += (x-mean_x)*(z-mean_z);
-              szy += (y-mean_y)*(z-mean_z);
+                if( xresid < _residualsXMin[help] || xresid > _residualsXMax[help]) 
+                {
+                    continue;
+                }
+                if( yresid < _residualsYMin[help] || yresid > _residualsYMax[help]) 
+                {
+                    continue;
+                }
+                if(!excluded)
+                {
+                    double sigmax  = _resolutionX[help];
+                    double sigmay  = _resolutionY[help];
+                    double sigmaz  = _resolutionZ[help];
+                    
+                    if( !( abs(x)<1e-06 && abs(y)<1e-06) )
+                    {
+                        mean_z += z;
+                        mean_x += x;
+                        mean_y += y;
+                        mean_n++;  
+                    } 
+                    
+                    if( abs(x)<1e-06 && abs(y)<1e-06  )
+                    {
+                        sigmax = 1000000.;
+                        sigmay = 1000000.;
+                        sigmaz = 1000000.;
+                    }
+                    hitsarray[index_hitsarray] = (hit(x, y, z,sigmax, sigmay, sigmaz,help));
+                    ++index_hitsarray;
+                }
             }
-          }
-          double linfit_x_a1 = szx/szz; //slope
-          double linfit_y_a1 = szy/szz; //slope
+            // Got the mean values of all the hits of each plane (in x,y,z)
+            mean_z = mean_z / static_cast< double >(mean_n);
+            mean_x = mean_x / static_cast< double >(mean_n);
+            mean_y = mean_y / static_cast< double >(mean_n);
             
-          double linfit_x_a0 = mean_x - linfit_x_a1 * mean_z; //offset
-          double linfit_y_a0 = mean_y - linfit_y_a1 * mean_z; //offset
+            int diff_mean = _nPlanes - mean_n;
+            streamlog_out( MESSAGE0 ) << " diff_mean: " << diff_mean << " _nPlanes = " << _nPlanes << " mean_n = " << mean_n << std::endl;
             
-          double del= -1.0*atan(linfit_y_a1);//guess of delta
-          double ps = atan(linfit_x_a1/sqrt(1.0+linfit_y_a1*linfit_y_a1));//guess
+            if( diff_mean > getAllowedMissingHits() ) 
+            {
+                continue;
+            }
+            
+            static bool firstminuitcall = true;
+            
+            if(firstminuitcall)
+            {
+                gSystem->Load("libMinuit");//is this really needed?
+                firstminuitcall = false;
+            }          
+            TMinuit *gMinuit = new TMinuit(4);  //initialize TMinuit with a maximum of 4 params
+
+            //  set print level (-1 = quiet, 0 = normal, 1 = verbose)
+            gMinuit->SetPrintLevel(-1);
+            gMinuit->SetFCN(fcn_wrapper);          
+            double arglist[10];
+            int ierflg = 0;
+            
+            // minimization strategy (1 = standard, 2 = slower)
+            arglist[0] = 2;
+            gMinuit->mnexcm("SET STR",arglist,2,ierflg);
+          
+            // set error definition (1 = for chi square)
+            arglist[0] = 1;
+            gMinuit->mnexcm("SET ERR",arglist,1,ierflg);
+          
+            //analytic track fit to guess the starting parameters
+            double sxx = 0.0;
+            double syy = 0.0;
+            double szz = 0.0;
+            
+            double szx = 0.0;
+            double szy = 0.0;
+            
+            for(size_t i = 0; i< number_of_datapoints; i++)
+            {
+                const double x = hitsarray[i].x;
+                const double y = hitsarray[i].y;
+                const double z = hitsarray[i].z;
+                if(!(abs(x)<1e-06 && abs(y)<1e-06) )
+                {
+                    sxx += pow(x-mean_x,2);
+                    syy += pow(y-mean_y,2);
+                    szz += pow(z-mean_z,2);
+                    
+                    szx += (x-mean_x)*(z-mean_z);
+                    szy += (y-mean_y)*(z-mean_z);
+                }
+            }
+            double linfit_x_a1 = szx/szz; //slope for x
+            double linfit_y_a1 = szy/szz; //slope for y
+            
+            double linfit_x_a0 = mean_x - linfit_x_a1 * mean_z; //offset
+            double linfit_y_a0 = mean_y - linfit_y_a1 * mean_z; //offset
+            
+            double del= -1.0*atan(linfit_y_a1);//guess of delta
+            double ps = atan(linfit_x_a1/sqrt(1.0+linfit_y_a1*linfit_y_a1));//guess
                                                                           //of psi
             
-          //  Set starting values and step sizes for parameters
-          Double_t vstart[4] = {linfit_x_a0, linfit_y_a0, del, ps};
-          //duble vstart[4] = {0.0, 0.0, 0.0, 0.0};
-          double step[4] = {0.01, 0.01, 0.01, 0.01};
+            //  Set starting values and step sizes for parameters
+            Double_t vstart[4] = {linfit_x_a0, linfit_y_a0, del, ps};
+            //duble vstart[4] = {0.0, 0.0, 0.0, 0.0};
+            double step[4] = {0.01, 0.01, 0.01, 0.01};
             
-          gMinuit->mnparm(0, "b0", vstart[0], step[0], 0,0,ierflg);
-          gMinuit->mnparm(1, "b1", vstart[1], step[1], 0,0,ierflg);
-          gMinuit->mnparm(2, "delta", vstart[2], step[2], -1.0*TMath::Pi(), 1.0*TMath::Pi(),ierflg);
-          gMinuit->mnparm(3, "psi", vstart[3], step[3], -1.0*TMath::Pi(), 1.0*TMath::Pi(),ierflg);
+            gMinuit->mnparm(0, "b0", vstart[0], step[0], 0,0,ierflg);
+            gMinuit->mnparm(1, "b1", vstart[1], step[1], 0,0,ierflg);
+            gMinuit->mnparm(2, "delta", vstart[2], step[2], -1.0*TMath::Pi(), 1.0*TMath::Pi(),ierflg);
+            gMinuit->mnparm(3, "psi", vstart[3], step[3], -1.0*TMath::Pi(), 1.0*TMath::Pi(),ierflg);
             
 
-          //  Now ready for minimization step
-          arglist[0] = 2000;
-          arglist[1] = 0.01;
-          gMinuit->mnexcm("MIGRAD", arglist ,1,ierflg);
+            //  Now ready for minimization step
+            arglist[0] = 2000;
+            arglist[1] = 0.01;
+            gMinuit->mnexcm("MIGRAD", arglist ,1,ierflg);
            
-          bool ok = true;
+            bool ok = true;
             
-          if(ierflg != 0)
-          {
-            ok = false;            
-          }
-                    
-          //   get results from migrad
-          double b0 = 0.0;
-          double b1 = 0.0;
-          double delta = 0.0;
-          double psi = 0.0;
-          double b0_error = 0.0;
-          double b1_error = 0.0;
-          double delta_error = 0.0;
-          double psi_error = 0.0;
-          
-          gMinuit->GetParameter(0,b0,b0_error);
-          gMinuit->GetParameter(1,b1,b1_error);
-          gMinuit->GetParameter(2,delta,delta_error);
-          gMinuit->GetParameter(3,psi,psi_error);
-          
-          double c0 = 1.0;
-          double c1 = 1.0;
-          double c2 = 1.0;
-          if(ok)
+            if(ierflg != 0)
             {
-              c0 = TMath::Sin(psi);
-              c1 = -1.0*TMath::Cos(psi) * TMath::Sin(delta);
-              c2 = TMath::Cos(delta) * TMath::Cos(psi);
-	      //cout << " b0: " << b0 << ", b1: " << b1 << ", c2: " << c2 << endl;
-              validminuittrack = true;
+                ok = false;            
+            }      
+            //   get results from migrad
+            double b0 = 0.0;
+            double b1 = 0.0;
+            double delta = 0.0;
+            double psi = 0.0;
+            double b0_error = 0.0;
+            double b1_error = 0.0;
+            double delta_error = 0.0;
+            double psi_error = 0.0;
+            
+            gMinuit->GetParameter(0,b0,b0_error);
+            gMinuit->GetParameter(1,b1,b1_error);
+            gMinuit->GetParameter(2,delta,delta_error);
+            gMinuit->GetParameter(3,psi,psi_error);
+            
+            double c0 = 1.0;
+            double c1 = 1.0;
+            double c2 = 1.0;
+            if(ok)
+            {
+                c0 = TMath::Sin(psi);
+                c1 = -1.0*TMath::Cos(psi) * TMath::Sin(delta);
+                c2 = TMath::Cos(delta) * TMath::Cos(psi);
+                //cout << " b0: " << b0 << ", b1: " << b1 << ", c2: " << c2 << endl;
+                validminuittrack = true;
               
-              for (unsigned int help =0; help < _nPlanes; help++)
+                for(unsigned int help =0; help < _nPlanes; help++)
                 {
-                  const double x = _xPos[track][help];
-                  const double y = _yPos[track][help];
-                  const double z = _zPos[track][help];
-                 
-                  //calculate the lambda parameter
-                  const double la = -1.0*b0*c0-b1*c1+c0*x+c1*y+sqrt(1-c0*c0-c1*c1)*z;
-                  lambda.push_back(la);
-/*
-		  if (_referenceHitVec == 0){                  
-                  //determine the residuals without reference vector
-                  _waferResidX[help] = b0 + la*c0 - x;
-                  _waferResidY[help] = b1 + la*c1 - y;
-                  _waferResidZ[help] = la*sqrt(1.0 - c0*c0 - c1*c1) - z;
-
-		  } else {
-*/
+                    const double x = _xPos[track][help];
+                    const double y = _yPos[track][help];
+                    const double z = _zPos[track][help];
+                    
+                    //calculate the lambda parameter
+                    const double la = -1.0*b0*c0-b1*c1+c0*x+c1*y+sqrt(1-c0*c0-c1*c1)*z;
+                    lambda.push_back(la);
 		    // use reference vector
 		    TVector3 vpoint(b0,b1,0.);
 		    TVector3 vvector(c0,c1,c2);
@@ -1749,124 +1740,115 @@ void EUTelMille::processEvent (LCEvent * event) {
 
 		    //determine the residuals
 		    if( !(abs(x)<1e-06 && abs(y)<1e-06)  )
-		      {
-			_waferResidX[help] = point[0] - x;
-			_waferResidY[help] = point[1] - y;
-			_waferResidZ[help] = point[2] - z;
+                    {
+                        _waferResidX[help] = point[0] - x;
+                        _waferResidY[help] = point[1] - y;
+                        _waferResidZ[help] = point[2] - z;
 			// TODO: THIS LOOKS LIKE A BUG!!
 			//cout << "point[2] = " << point[2] << ", z = " << z << endl;
 			//cout << "z residual w/ ref vec: " << _waferResidZ[help] << ", w/o ref vec: " << la*sqrt(1.0 - c0*c0 - c1*c1) - z << endl;
-		      }else{
-		      _waferResidX[help] = 0.;
-		      _waferResidY[help] = 0.;
-		      _waferResidZ[help] = 0.;
-		    }
-		/*  
-		}
-		*/
+		      }
+                    else
+                    {
+                        _waferResidX[help] = 0.;
+                        _waferResidY[help] = 0.;
+                        _waferResidZ[help] = 0.;
+                    }
                 }
             }
-          delete gMinuit;
+            delete gMinuit;
         }
-      else
+        else
         {
-          streamlog_out(MESSAGE1) << " AlignMode = " << _alignMode << " _inputMode = " << _inputMode << std::endl;
-          // Calculate residuals
-          FitTrack(_nPlanes,
-                   _xPosHere,
-                   _yPosHere,
-                   _zPosHere,
-                   _telescopeResolX,
-                   _telescopeResolY,
-                   Chiquare,
-                   _waferResidX,
-                   _waferResidY,
-                   angle);
+            streamlog_out(MESSAGE1) << " AlignMode = " << _alignMode << " _inputMode = " << _inputMode << std::endl;
+            // Calculate residuals
+            FitTrack(_nPlanes,
+                    _xPosHere,
+                    _yPosHere,
+                    _zPosHere,
+                    _telescopeResolX,
+                    _telescopeResolY,
+                    Chiquare,
+                    _waferResidX,
+                    _waferResidY,
+                    angle);
         }
-
-      }
- 
-      streamlog_out ( MESSAGE1 ) << "Residuals X: ";
-
-      for (unsigned int help = 0; help < _nPlanes; help++) {
-        streamlog_out ( MESSAGE1 ) << _waferResidX[help] << " ";
-      }
-
-      streamlog_out ( MESSAGE1 ) << endl;
-
-      streamlog_out ( MESSAGE1 ) << "Residuals Y: ";
-
-      for (unsigned int help = 0; help < _nPlanes; help++) {
-        streamlog_out ( MESSAGE1 ) << _waferResidY[help] << " ";
-      }
-
-      streamlog_out ( MESSAGE1 ) << endl;
-
-      streamlog_out ( MESSAGE1 ) << "Residuals Z: ";
-
-      for (unsigned int help = 0; help < _nPlanes; help++) {
-        streamlog_out ( MESSAGE1 ) << _waferResidZ[help] << " ";
-      }
-
-      streamlog_out ( MESSAGE1 ) << endl;
-
-
-      int residualsXOkay = 1;
-      int residualsYOkay = 1;
-
-      // check if residal cuts are used
-      if (_useResidualCuts != 0) 
-      {
-
-        // loop over all sensors
+        streamlog_out ( MESSAGE1 ) << "Residuals X: ";
+        
+        for(unsigned int help = 0; help < _nPlanes; help++) 
+        {
+            streamlog_out ( MESSAGE1 ) << _waferResidX[help] << " ";
+        }
+        streamlog_out ( MESSAGE1 ) << endl;
+        
+        streamlog_out ( MESSAGE1 ) << "Residuals Y: ";
         for (unsigned int help = 0; help < _nPlanes; help++) 
         {
-          int excluded = 0; //0 not excluded, 1 excluded
-          if (_nExcludePlanes > 0) 
-          {
-            for (int helphelp = 0; helphelp < _nExcludePlanes; helphelp++) 
+            streamlog_out ( MESSAGE1 ) << _waferResidY[help] << " ";
+        }
+        streamlog_out ( MESSAGE1 ) << endl;
+        
+        streamlog_out ( MESSAGE1 ) << "Residuals Z: ";
+        for (unsigned int help = 0; help < _nPlanes; help++) 
+        {
+            streamlog_out ( MESSAGE1 ) << _waferResidZ[help] << " ";      
+        }
+        streamlog_out ( MESSAGE1 ) << endl;
+        
+        int residualsXOkay = 1;
+        int residualsYOkay = 1;
+        
+        // check if residal cuts are used
+        if (_useResidualCuts != 0) 
+        {
+            // loop over all sensors
+            for (unsigned int help = 0; help < _nPlanes; help++) 
             {
-              if (help == _excludePlanes[helphelp]) 
-              {
-                excluded = 1;
-              }
-            }
-          }
-          if(excluded == 0)
-          {
-              if (_waferResidX[help] < _residualsXMin[help] || _waferResidX[help] > _residualsXMax[help]) 
-              {
-                residualsXOkay = 0;
-              }
-              if (_waferResidY[help] < _residualsYMin[help] || _waferResidY[help] > _residualsYMax[help]) 
-              {
-                residualsYOkay = 0;
-              }
-          }
+                int excluded = 0; //0 not excluded, 1 excluded
+                if (_nExcludePlanes > 0) 
+                {
+                    for (int helphelp = 0; helphelp < _nExcludePlanes; helphelp++) 
+                    {
+                        if (help == _excludePlanes[helphelp]) 
+                        {
+                            excluded = 1;
+                        }
+                    }
+                }
+                if(excluded == 0)
+                {
+                    if (_waferResidX[help] < _residualsXMin[help] || _waferResidX[help] > _residualsXMax[help]) 
+                    {
+                        residualsXOkay = 0;
+                    }
+                    if (_waferResidY[help] < _residualsYMin[help] || _waferResidY[help] > _residualsYMax[help]) 
+                    {
+                        residualsYOkay = 0;
+                    }
+                }
+            } // end loop over all sensors
+            
+        } // end check if residual cuts are used
 
-        } // end loop over all sensors
+        if(_useResidualCuts != 0 && (residualsXOkay == 0 || residualsYOkay == 0)) 
+        {
+            streamlog_out ( MESSAGE1 ) << "Track did not pass the residual cuts." << endl;
+        }
 
-      } // end check if residual cuts are used
+        // apply track cuts (at the moment only residuals)
+        if (_useResidualCuts == 0 || (residualsXOkay == 1 && residualsYOkay == 1)) 
+        {
+            // Add track to Millepede
+            // ---------------------------
+            // Easy case: consider only shifts
+            if (_alignMode == 2) 
+            {
+                const int nLC = 4; // number of local parameters
+                const int nGL = (_nPlanes - _nExcludePlanes) * 2; // number of global parameters
 
-      if (_useResidualCuts != 0 && (residualsXOkay == 0 || residualsYOkay == 0)) {
-        streamlog_out ( MESSAGE1 ) << "Track did not pass the residual cuts." << endl;
-      }
+                float sigma = _telescopeResolution;
 
-      // apply track cuts (at the moment only residuals)
-      if (_useResidualCuts == 0 || (residualsXOkay == 1 && residualsYOkay == 1)) {
-
-        // Add track to Millepede
-        // ---------------------------
-
-        // Easy case: consider only shifts
-        if (_alignMode == 2) {
-
-          const int nLC = 4; // number of local parameters
-          const int nGL = (_nPlanes - _nExcludePlanes) * 2; // number of global parameters
-
-          float sigma = _telescopeResolution;
-
-          float *derLC = new float[nLC]; // array of derivatives for local parameters
+                float *derLC = new float[nLC]; // array of derivatives for local parameters
           float *derGL = new float[nGL]; // array of derivatives for global parameters
 
           int *label = new int[nGL]; // array of labels
@@ -2341,7 +2323,6 @@ else
 
     } // end loop over all track candidates
 
-  } // end if only one track or no single track event
 
   streamlog_out ( MESSAGE1 ) << "Finished fitting tracks in event " << _iEvt << endl;
 
@@ -2476,80 +2457,91 @@ bool EUTelMille::hitContainsHotPixels( TrackerHitImpl   * hit)
 }
 
 
-void EUTelMille::end() {
+void EUTelMille::end() 
+{
+    delete [] _telescopeResolY;
+    delete [] _telescopeResolX;
+    delete [] _telescopeResolZ;
+    delete [] _yFitPos;
+    delete [] _xFitPos;
+    delete [] _waferResidY;
+    delete [] _waferResidX;
+    delete [] _waferResidZ;
 
-  delete [] _telescopeResolY;
-  delete [] _telescopeResolX;
-  delete [] _telescopeResolZ;
-  delete [] _yFitPos;
-  delete [] _xFitPos;
-  delete [] _waferResidY;
-  delete [] _waferResidX;
-  delete [] _waferResidZ;
-
-  if(_alignMode == 3)
+    if(_alignMode == 3)
     {
-      delete []  hitsarray;
+        delete []  hitsarray;
     }
 
-  // close the output file
-  delete _mille;
+    // close the output file
+    delete _mille;
 
-  // if write the pede steering file
-  if (_generatePedeSteerfile) {
+    // if write the pede steering file
+    if (_generatePedeSteerfile) 
+    {
+        streamlog_out ( MESSAGE4 ) << endl << "Generating the steering file for the pede program..." << endl;
+        
+        string tempHistoName;
+        double *meanX = new double[_nPlanes];
+        double *meanY = new double[_nPlanes];
+        double *meanZ = new double[_nPlanes];
+        
+        // loop over all detector planes
+        for(unsigned int iDetector = 0; iDetector < _nPlanes; iDetector++ ) 
+        {
+            int sensorID = _orderedSensorID.at( iDetector );
+            
+            if ( _histogramSwitch ) 
+            {
+                tempHistoName =  _residualXLocalname + "_d" + to_string( sensorID );
+                if( AIDA::IHistogram1D* residx_histo = dynamic_cast<AIDA::IHistogram1D*>(_aidaHistoMap[tempHistoName.c_str()]) )
+                {
+                    meanX[iDetector] = residx_histo->mean();
+                }
+                else 
+                {
+                    streamlog_out ( ERROR2 ) << "Not able to retrieve histogram pointer for " << _residualXLocalname << endl;
+                    streamlog_out ( ERROR2 ) << "Disabling histogramming from now on" << endl;
+                    _histogramSwitch = false;
+                }
+            }
 
-    streamlog_out ( MESSAGE4 ) << endl << "Generating the steering file for the pede program..." << endl;
+            if( _histogramSwitch ) 
+            {
+                tempHistoName =  _residualYLocalname + "_d" + to_string( sensorID );
+                if ( AIDA::IHistogram1D* residy_histo = dynamic_cast<AIDA::IHistogram1D*>(_aidaHistoMap[tempHistoName.c_str()]) )
+                {
+                    meanY[iDetector] = residy_histo->mean();
+                }
+                else 
+                {
+                    streamlog_out ( ERROR2 ) << "Not able to retrieve histogram pointer for " << _residualYLocalname << endl;
+                    streamlog_out ( ERROR2 ) << "Disabling histogramming from now on" << endl;
+                    _histogramSwitch = false;
+                }
+            }
+            if ( _histogramSwitch ) 
+            {
+                tempHistoName =  _residualZLocalname + "_d" + to_string( sensorID );
+                if ( AIDA::IHistogram1D* residz_histo = dynamic_cast<AIDA::IHistogram1D*>(_aidaHistoMap[tempHistoName.c_str()]) )
+                {
+                    meanZ[iDetector] = residz_histo->mean();
+                }
+                else
+                {
+                    streamlog_out ( ERROR2 ) << "Not able to retrieve histogram pointer for " << _residualZLocalname << endl;
+                    streamlog_out ( ERROR2 ) << "Disabling histogramming from now on" << endl;
+                    _histogramSwitch = false;
+                } 
+            }
+        } // end loop over all detector planes
 
-    string tempHistoName;
-    double *meanX = new double[_nPlanes];
-    double *meanY = new double[_nPlanes];
-    double *meanZ = new double[_nPlanes];
-
-    // loop over all detector planes
-    for(unsigned int iDetector = 0; iDetector < _nPlanes; iDetector++ ) {
-
-      int sensorID = _orderedSensorID.at( iDetector );
-
-      if ( _histogramSwitch ) {
-        tempHistoName =  _residualXLocalname + "_d" + to_string( sensorID );
-        if ( AIDA::IHistogram1D* residx_histo = dynamic_cast<AIDA::IHistogram1D*>(_aidaHistoMap[tempHistoName.c_str()]) )
-          meanX[iDetector] = residx_histo->mean();
-        else {
-          streamlog_out ( ERROR2 ) << "Not able to retrieve histogram pointer for " << _residualXLocalname << endl;
-          streamlog_out ( ERROR2 ) << "Disabling histogramming from now on" << endl;
-          _histogramSwitch = false;
-        }
-      }
-
-      if ( _histogramSwitch ) {
-        tempHistoName =  _residualYLocalname + "_d" + to_string( sensorID );
-        if ( AIDA::IHistogram1D* residy_histo = dynamic_cast<AIDA::IHistogram1D*>(_aidaHistoMap[tempHistoName.c_str()]) )
-          meanY[iDetector] = residy_histo->mean();
-        else {
-          streamlog_out ( ERROR2 ) << "Not able to retrieve histogram pointer for " << _residualYLocalname << endl;
-          streamlog_out ( ERROR2 ) << "Disabling histogramming from now on" << endl;
-          _histogramSwitch = false;
-        }
-      }
-
-      if ( _histogramSwitch ) {
-        tempHistoName =  _residualZLocalname + "_d" + to_string( sensorID );
-        if ( AIDA::IHistogram1D* residz_histo = dynamic_cast<AIDA::IHistogram1D*>(_aidaHistoMap[tempHistoName.c_str()]) )
-          meanZ[iDetector] = residz_histo->mean();
-        else {
-          streamlog_out ( ERROR2 ) << "Not able to retrieve histogram pointer for " << _residualZLocalname << endl;
-          streamlog_out ( ERROR2 ) << "Disabling histogramming from now on" << endl;
-          _histogramSwitch = false;
-        } 
-      }
-    } // end loop over all detector planes
-
-    ofstream steerFile;
-    steerFile.open(_pedeSteerfileName.c_str());
-
-    if (steerFile.is_open()) {
-
-      // find first and last excluded plane
+        ofstream steerFile;
+        steerFile.open(_pedeSteerfileName.c_str());
+        
+        if (steerFile.is_open()) 
+        {
+            // find first and last excluded plane
       unsigned int firstnotexcl = _nPlanes;
       unsigned int lastnotexcl = 0;
 
