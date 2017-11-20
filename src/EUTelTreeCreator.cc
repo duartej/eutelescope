@@ -482,22 +482,11 @@ void EUTelTreeCreator::processEvent (LCEvent * event)
             // with a dumb value
             if(raw_clusters.size() <= 4)
             {
-                _branches_I["hit_Ncluster_"+id_str]->push_back(-2);
+                _branches["hit_cluster_eta_"+id_str]->push_back(-1);
                 continue;
             }
             // Obtain the eta
             // ----------------------------------------------
-            // Using all the elements in the cluster
-            /*std::map<int,float> channelsOrdered;
-            for(int k=0; k < raw_clusters.size()-3.0; k+=4)
-            {
-                channelsOrdered.insert(std::pair<int,float>(static_cast<int>(raw_clusters[k]),raw_clusters[k+2]));
-            }
-            // Just add all the charges
-            float leftCh = channelsOrdered.begin()->second;
-            float totalSignal = std::accumulate(channelsOrdered.begin(),channelsOrdered.end(), 0.0,
-                    [] (const float & last_element, const std::pair<int,float> & it2) { return (last_element+it2.second); });
-            _branches["hit_cluster_eta_"+id_str]->push_back(leftCh/totalSignal);*/
             // Just using the edges on the cluster
             std::map<float,int> channelsOrderedBySignal;
             for(int k=0; k < raw_clusters.size()-3.0; k+=4)
