@@ -477,11 +477,15 @@ void EUTelTreeCreator::processEvent (LCEvent * event)
             // See addSparsePixel function at EUTelTrackerDataInterfacerImpl.hcc
             auto & raw_clusters = static_cast<TrackerDataImpl*>(rawhits[0])->getChargeValues();
             _branches_I["hit_Ncluster_"+id_str]->push_back(raw_clusters.size()/4);
+            // Not having the information about the signal on the
+            // neighbour strip for clusters size =1 (4/4) --> just fill it 
+            // with a dumb value
             if(raw_clusters.size() <= 4)
             {
+                _branches_I["hit_Ncluster_"+id_str]->push_back(-2);
                 continue;
             }
-            // Obtain the eta (whenever the cluster is N > 2)
+            // Obtain the eta
             // ----------------------------------------------
             // Using all the elements in the cluster
             /*std::map<int,float> channelsOrdered;
@@ -512,7 +516,7 @@ void EUTelTreeCreator::processEvent (LCEvent * event)
                 left = nextToHighestSignal;
                 right= highestSignal;
             }
-            _branches["hit_cluster_eta_"+id_str]->push_back(left->first/(left->first+right->first));
+            _branches["hit_cluster_eta_"+id_str]->push_back(right->first/(left->first+right->first));
         }
         else
         {
