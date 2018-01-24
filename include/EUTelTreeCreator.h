@@ -59,6 +59,9 @@ namespace eutelescope
             // Auxiliary function
             void clear_branches();
 
+            //! The sensitive axis of the sensors
+            int _sensitive_axis;
+
             //! Input TrackerHit collection name
             /*! This is the name the user wants to give to the input hit
              *  collection.

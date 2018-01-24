@@ -54,6 +54,7 @@ using namespace eutelescope;
 // definition of static members mainly used to name histograms
 EUTelTreeCreator::EUTelTreeCreator():
     Processor("EUTelTreeCreator"),
+    _sensitive_axis(0),
     _inputHitCollectionName(),
     _inputTrackCollectionName(),
     _telescopePlanes(),
@@ -85,6 +86,10 @@ EUTelTreeCreator::EUTelTreeCreator():
     
     registerProcessorParameter("DUTPlanes", "The id of the DUT planes",
             _dutPlanes, std::vector<int>({5,6}));
+    
+    registerProcessorParameter("SensitiveX", "Set 0 if X-coordinate is the sensitive one"\
+            " or 1 if is the Y",
+            _sensitive_axis, int(0));
 }
 
 /*EUTelTreeCreator::~EUTelTreeCreator()
@@ -491,7 +496,9 @@ void EUTelTreeCreator::processEvent (LCEvent * event)
             std::map<float,int> channelsOrderedBySignal;
             for(int k=0; k < raw_clusters.size()-3.0; k+=4)
             {
-                channelsOrderedBySignal.insert(std::pair<float,int>(raw_clusters[k+2],static_cast<int>(raw_clusters[k])));
+                // Note that in every group of 4 values, 
+                // the x is the 0 and the y is the 1 
+                channelsOrderedBySignal.insert(std::pair<float,int>(raw_clusters[k+2],static_cast<int>(raw_clusters[k+_sensitive_axis])));
             }
             // Using the two highest signals
             auto highestSignal = channelsOrderedBySignal.rbegin();
