@@ -6,6 +6,7 @@
 // system includes <>
 #include <string>
 #include <vector>
+#include <map>
 
 #include <TFile.h>
 #include <TTree.h>
@@ -46,6 +47,8 @@ namespace eutelescope {
     std::map<int, float> _xSensSize;
     std::map<int, float> _ySensSize;
 
+    std::map<int,int> _indexIDMap;
+
     // Internal processor variables
     // ----------------------------
     int _nRun;
@@ -67,6 +70,7 @@ namespace eutelescope {
     std::vector<int> *_trackNum;
     std::vector<double> *_chi2;
     std::vector<double> *_ndof;
+    std::vector<int> *_hitpattern;
 
     TTree *_zstree;
     int _nPixHits;

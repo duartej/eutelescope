@@ -13,6 +13,7 @@
 #include <EVENT/LCCollection.h>
 #include <EVENT/LCEvent.h>
 #include <IMPL/LCCollectionVec.h>
+#include <IMPL/TrackerPulseImpl.h>
 #include <IMPL/TrackImpl.h>
 #include <IMPL/TrackerHitImpl.h>
 #include <UTIL/CellIDDecoder.h>
@@ -29,6 +30,7 @@ EUTelAPIXTbTrackTuple::EUTelAPIXTbTrackTuple()
       _runNr(0), _evtNr(0), _isFirstEvent(false), _file(nullptr), _eutracks(nullptr),
       _nTrackParams(0), _xPos(nullptr), _yPos(nullptr), _dxdz(nullptr), _dydz(nullptr),
       _trackIden(nullptr), _trackNum(nullptr), _chi2(nullptr), _ndof(nullptr),
+      _hitpattern(nullptr),
       _zstree(nullptr), _nPixHits(0), p_col(nullptr), p_row(nullptr), p_tot(nullptr),
       p_iden(nullptr), p_lv1(nullptr), p_hitTime(nullptr), p_frameTime(nullptr),
       _euhits(nullptr), _nHits(0), _hitXPos(nullptr), _hitYPos(nullptr), _hitZPos(nullptr),
@@ -43,7 +45,7 @@ EUTelAPIXTbTrackTuple::EUTelAPIXTbTrackTuple()
   registerInputCollection(LCIO::TRACKERHIT, "InputTrackerHitCollectionName",
                           "Name of the plane-wide hit-data hit collection",
                           _inputTrackerHitColName, std::string("fitpoints"));
-
+  
   registerProcessorParameter("DutZsColName",
                              "DUT zero surpressed data colection name",
                              _dutZsColName, std::string("zsdata_apix"));
@@ -70,6 +72,15 @@ void EUTelAPIXTbTrackTuple::init() {
 
   geo::gGeometry().initializeTGeoDescription(EUTELESCOPE::GEOFILENAME,
                                              EUTELESCOPE::DUMPGEOROOT);
+  
+  // XXX Assumes the gear file contain the planes ordered in z, anyway
+  // do we need the order?
+  int plane=0;
+  for(unsigned int sensorID : geo::gGeometry().sensorIDsVec()) 
+  {
+      _indexIDMap[sensorID] = plane;
+      plane++;
+  }
 
   for (auto dutID : _DUTIDs) {
     // Later we need to shift the sensor since in EUTel centre of sensor is 0|0
@@ -208,6 +219,24 @@ bool EUTelAPIXTbTrackTuple::readTracks(LCEvent *event) {
     double dxdz = fittrack->getOmega();
     double dydz = fittrack->getPhi();
 
+    // extract the hit pattern. In bits ordered by z ()
+    // [ Pln ... Pl2 Pl1 Pl0 ]
+    UTIL::CellIDDecoder<TrackerHitImpl> hitDecoder(EUTELESCOPE::HITENCODING);
+    int hitpattern = 0;
+    for(unsigned int ih=0; ih < trackhits.size(); ++ih)
+    {
+        TrackerHitImpl * meashit = dynamic_cast<TrackerHitImpl*>(trackhits[ih]);
+        if( (hitCellDecoder(meashit)["properties"] & kFittedHit) != 0)
+        {
+            // fitted hits, skip it
+            continue;
+        }
+        const int plane =  _indexIDMap[hitDecoder(meashit)["sensorID"]];
+        //const int hitmask = (1 << plane);
+        // Activate the corresponding bit to that plane
+        hitpattern |= (1 << plane); //hitmask;
+    }
+
     /* Get the (fitted) hits belonging to this track,
        they are in global frame when coming from the straight track fitter */
     for (unsigned int ihit = 0; ihit < trackhits.size(); ihit++) {
@@ -218,7 +247,7 @@ bool EUTelAPIXTbTrackTuple::readTracks(LCEvent *event) {
         continue;
       }
 
-      UTIL::CellIDDecoder<TrackerHitImpl> hitDecoder(EUTELESCOPE::HITENCODING);
+      //UTIL::CellIDDecoder<TrackerHitImpl> hitDecoder(EUTELESCOPE::HITENCODING);
       int sensorID = hitDecoder(fittedHit)["sensorID"];
 
       // Dump the (fitted) hits for the DUTs
@@ -244,6 +273,7 @@ bool EUTelAPIXTbTrackTuple::readTracks(LCEvent *event) {
       _trackNum->push_back(itrack);
       _chi2->push_back(chi2);
       _ndof->push_back(ndof);
+      _hitpattern->push_back(hitpattern);
     }
   }
 
@@ -324,6 +354,7 @@ void EUTelAPIXTbTrackTuple::clear() {
   _trackIden->clear();
   _chi2->clear();
   _ndof->clear();
+  _hitpattern->clear();
   // Clear hits
   _hitXPos->clear();
   _hitYPos->clear();
@@ -342,6 +373,7 @@ void EUTelAPIXTbTrackTuple::prepareTree() {
   _trackNum = new std::vector<int>();
   _chi2 = new std::vector<double>();
   _ndof = new std::vector<double>();
+  _hitpattern = new std::vector<int>();
 
   p_col = new std::vector<int>();
   p_row = new std::vector<int>();
@@ -394,6 +426,7 @@ void EUTelAPIXTbTrackTuple::prepareTree() {
   _eutracks->Branch("iden", &_trackIden);
   _eutracks->Branch("chi2", &_chi2);
   _eutracks->Branch("ndof", &_ndof);
+  _eutracks->Branch("hitPattern",&_hitpattern);
 
   _euhits->AddFriend(_zstree);
   _euhits->AddFriend(_eutracks);
