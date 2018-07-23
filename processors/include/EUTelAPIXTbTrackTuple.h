@@ -33,9 +33,11 @@ namespace eutelescope {
     bool readZsHits(std::string colName, LCEvent *event);
     bool readTracks(LCEvent *event);
     bool readHits(std::string hitColName, LCEvent *event);
+    bool readMeasHits(std::string hitColName, LCEvent *event);
 
     std::string _inputTrackColName;
     std::string _inputTrackerHitColName;
+    std::string _inputMeasHitColName;
     std::string _inputTelPulseCollectionName;
     std::string _inputDutPulseCollectionName;
     std::string _telZsColName;
@@ -82,6 +84,15 @@ namespace eutelescope {
     std::vector<int> *p_chip;
     std::vector<int> *p_hitTime;
     std::vector<double> *p_frameTime;
+
+    TTree *_mhits;
+    int _nmHits;
+    std::vector<double> *_mhitXpos;
+    std::vector<double> *_mhitYpos;
+    std::vector<int>    *_mhitTOT;
+    std::vector<int>    *_mhitId;
+    std::vector<int>    *_mhitBCID;
+    std::vector<int>    *_mhitSize;
 
     TTree *_euhits;
     int _nHits;

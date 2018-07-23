@@ -5,6 +5,7 @@
 #include "EUTelExceptions.h"
 #include "EUTelRunHeaderImpl.h"
 #include "EUTelTrackerDataInterfacerImpl.h"
+#include "EUTelUtility.h"
 
 // eutelescope geometry
 #include "EUTelGenericPixGeoDescr.h"
@@ -24,7 +25,8 @@ using namespace eutelescope;
 
 EUTelAPIXTbTrackTuple::EUTelAPIXTbTrackTuple()
     : Processor("EUTelAPIXTbTrackTuple"), _inputTrackColName(""),
-      _inputTrackerHitColName(""), _inputTelPulseCollectionName(""),
+      _inputTrackerHitColName(""), _inputMeasHitColName(""),
+      _inputTelPulseCollectionName(""),
       _inputDutPulseCollectionName(""), _telZsColName(""), _dutZsColName(""),
       _path2file(""), _DUTIDs(std::vector<int>()), _nRun(0), _nEvt(0),
       _runNr(0), _evtNr(0), _isFirstEvent(false), _file(nullptr), _eutracks(nullptr),
@@ -33,6 +35,8 @@ EUTelAPIXTbTrackTuple::EUTelAPIXTbTrackTuple()
       _hitpattern(nullptr),
       _zstree(nullptr), _nPixHits(0), p_col(nullptr), p_row(nullptr), p_tot(nullptr),
       p_iden(nullptr), p_lv1(nullptr), p_hitTime(nullptr), p_frameTime(nullptr),
+      _mhits(nullptr),_nmHits(0),_mhitXpos(nullptr),_mhitYpos(nullptr),_mhitTOT(nullptr),
+      _mhitId(nullptr),_mhitBCID(nullptr),_mhitSize(nullptr),
       _euhits(nullptr), _nHits(0), _hitXPos(nullptr), _hitYPos(nullptr), _hitZPos(nullptr),
       _hitSensorId(nullptr) {
   // processor description
@@ -45,6 +49,10 @@ EUTelAPIXTbTrackTuple::EUTelAPIXTbTrackTuple()
   registerInputCollection(LCIO::TRACKERHIT, "InputTrackerHitCollectionName",
                           "Name of the plane-wide hit-data hit collection",
                           _inputTrackerHitColName, std::string("fitpoints"));
+  
+  registerInputCollection(LCIO::TRACKERHIT, "InputMeasuredHitCollectionName",
+                          "Name of the measured local hit collection",
+                          _inputMeasHitColName, std::string("local_hit"));
   
   registerProcessorParameter("DutZsColName",
                              "DUT zero surpressed data colection name",
@@ -113,12 +121,16 @@ void EUTelAPIXTbTrackTuple::processEvent(LCEvent *event) {
     streamlog_out(DEBUG5) << "EORE found: nothing else to do." << std::endl;
     return;
   }
-
   // Clear all event info containers
   clear();
 
   // try to read in hits (e.g. fitted hits in local frame)
   if (!readHits(_inputTrackerHitColName, event)) {
+    return;
+  }
+  
+  // try to read in measured hits in the local frame
+  if (!readMeasHits(_inputMeasHitColName, event)) {
     return;
   }
 
@@ -135,7 +147,9 @@ void EUTelAPIXTbTrackTuple::processEvent(LCEvent *event) {
   // fill the trees
   _zstree->Fill();
   _eutracks->Fill();
+  _mhits->Fill();
   _euhits->Fill();
+
 
   _isFirstEvent = false;
 }
@@ -190,6 +204,74 @@ bool EUTelAPIXTbTrackTuple::readHits(std::string hitColName, LCEvent *event) {
   }
 
   return true;
+}
+
+// Read in TrackerHit(Impl) to later dump them
+bool EUTelAPIXTbTrackTuple::readMeasHits(std::string hitColName, LCEvent *event) 
+{
+    LCCollection *hitCollection = nullptr;
+    try 
+    {
+        hitCollection = event->getCollection(hitColName);
+    } catch (lcio::DataNotAvailableException &e) 
+    {
+        streamlog_out(DEBUG2) << "Hit collection " << hitColName
+            << " not found in event " << event->getEventNumber()
+            << "!" << std::endl;
+        return false;
+    }
+    
+    const int nmHit = hitCollection->getNumberOfElements();
+
+    _nmHits = 0;    
+    for(int ihit = 0; ihit < nmHit; ++ihit) 
+    {
+        TrackerHitImpl *meshit = dynamic_cast<TrackerHitImpl *>(hitCollection->getElementAt(ihit));
+        const double *pos = meshit->getPosition();
+        
+        UTIL::CellIDDecoder<TrackerHitImpl> hitDecoder(EUTELESCOPE::HITENCODING);
+        const int sensorID = hitDecoder(meshit)["sensorID"];
+        
+        // Only dump DUT hits
+        if(std::find(_DUTIDs.begin(), _DUTIDs.end(), sensorID) == _DUTIDs.end()) 
+        {
+            continue;
+        }
+        ++_nmHits;
+        // the Raw data
+        const auto raw = meshit->getRawHits();
+        if(raw.size() == 0 || raw[0] == nullptr)
+        {
+            streamlog_out(ERROR) << "Severe issue: hit does" <<
+                "not contain its raw data" << std::endl;
+            return false;
+        }
+        // Note that the TrackDataImpl::getChargeValues() function returns a vector which
+        // conntains [X-coordinate,Y-coordinate, TOT ,time, ??, ?? , ?? ,?? ] per each element of the cluster
+        auto & zsdata = static_cast<TrackerDataImpl*>(raw[0])->getChargeValues();
+        int charge=0;
+        for(unsigned int k=0; k < zsdata.size()-7; k+=8)
+        {
+            charge += zsdata[k+2];
+        }
+        // Obtain the eta
+        // ---- blahablha 
+        //int clusterSizeX = -1;
+        //int clusterSizeY = -1;
+        //cluster->getClusterSize(clusterSizeX,clusterSizeY);
+        //int clusterSize = clusterSizeX*clusterSizeY;
+        
+        // Fill the tree
+        // offset by half sensor/sensitive size
+        _mhitXpos->push_back(pos[0]+_xSensSize.at(sensorID)/2.0);
+        _mhitYpos->push_back(pos[1]+_ySensSize.at(sensorID)/2.0);
+        _mhitTOT->push_back(charge);
+        _mhitId->push_back(sensorID);
+        _mhitBCID->push_back(zsdata[3]);
+        //_mhitSize->push_back(clusterSize);
+        _mhitSize->push_back(zsdata.size()/8);
+    }
+    return true;
 }
 
 // Read in TrackerHit to later dump
@@ -345,6 +427,16 @@ void EUTelAPIXTbTrackTuple::clear() {
   p_hitTime->clear();
   p_frameTime->clear();
   _nPixHits = 0;
+  
+  // Clear measured hits
+  _nmHits=0;
+  _mhitXpos->clear();
+  _mhitYpos->clear(); 
+  _mhitTOT->clear();
+  _mhitId->clear();
+  _mhitBCID->clear();
+  _mhitSize->clear();
+
   /* Clear hittrack */
   _xPos->clear();
   _yPos->clear();
@@ -374,6 +466,13 @@ void EUTelAPIXTbTrackTuple::prepareTree() {
   _chi2 = new std::vector<double>();
   _ndof = new std::vector<double>();
   _hitpattern = new std::vector<int>();
+  
+  _mhitXpos = new std::vector<double>();
+  _mhitYpos = new std::vector<double>();
+  _mhitTOT  = new std::vector<int>();
+  _mhitId   = new std::vector<int>();
+  _mhitBCID = new std::vector<int>();
+  _mhitSize = new std::vector<int>();
 
   p_col = new std::vector<int>();
   p_row = new std::vector<int>();
@@ -413,6 +512,17 @@ void EUTelAPIXTbTrackTuple::prepareTree() {
   _zstree->Branch("hitTime", &p_hitTime);
   _zstree->Branch("frameTime", &p_frameTime);
 
+  _mhits = new TTree("meashits", "meashits");
+  _mhits->SetAutoSave(1000000000);
+
+  _mhits->Branch("nHits", &_nmHits);
+  _mhits->Branch("xPos", &_mhitXpos);
+  _mhits->Branch("yPos", &_mhitYpos);
+  _mhits->Branch("tot", &_mhitTOT);
+  _mhits->Branch("sensorId", &_mhitId);
+  _mhits->Branch("bcid", &_mhitBCID);
+  _mhits->Branch("clusterSize", &_mhitSize);
+
   // Tree for storing all track param info
   _eutracks = new TTree("tracks", "tracks");
   _eutracks->SetAutoSave(1000000000);
@@ -430,4 +540,5 @@ void EUTelAPIXTbTrackTuple::prepareTree() {
 
   _euhits->AddFriend(_zstree);
   _euhits->AddFriend(_eutracks);
+  _euhits->AddFriend(_mhits);
 }
