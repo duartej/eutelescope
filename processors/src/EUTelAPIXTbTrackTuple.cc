@@ -47,6 +47,7 @@ EUTelAPIXTbTrackTuple::EUTelAPIXTbTrackTuple()
       _mhits(nullptr),_nmHits(0),_mhitXpos(nullptr),_mhitYpos(nullptr),
       _mhitEtaX(nullptr),_mhitEtaY(nullptr),_mhitTOT(nullptr),
       _mhitId(nullptr),_mhitBCID(nullptr),_mhitSize(nullptr),
+      _mhitsSizeX(nullptr),_mhitsSizeY(nullptr),
       _euhits(nullptr), _nHits(0), _hitXPos(nullptr), _hitYPos(nullptr), _hitZPos(nullptr),
       _hitSensorId(nullptr) {
   // processor description
@@ -543,7 +544,7 @@ void EUTelAPIXTbTrackTuple::clear() {
   _mhitBCID->clear();
   _mhitSize->clear();
   _mhitSizeX->clear();
-  _mhitSizeX->clear();
+  _mhitSizeY->clear();
 
   /* Clear hittrack */
   _xPos->clear();
