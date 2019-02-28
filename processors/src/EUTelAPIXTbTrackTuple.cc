@@ -6,6 +6,10 @@
 #include "EUTelRunHeaderImpl.h"
 #include "EUTelTrackerDataInterfacerImpl.h"
 #include "EUTelUtility.h"
+#include "EUTelVirtualCluster.h"
+#include "EUTelBrickedClusterImpl.h"
+#include "EUTelDFFClusterImpl.h"
+#include "EUTelSparseClusterImpl.h"
 
 // eutelescope geometry
 #include "EUTelGenericPixGeoDescr.h"
@@ -13,13 +17,18 @@
 
 #include <EVENT/LCCollection.h>
 #include <EVENT/LCEvent.h>
+#include <EVENT/LCObject.h>
 #include <IMPL/LCCollectionVec.h>
 #include <IMPL/TrackerPulseImpl.h>
 #include <IMPL/TrackImpl.h>
 #include <IMPL/TrackerHitImpl.h>
 #include <UTIL/CellIDDecoder.h>
 
+#include <set>
 #include <algorithm>
+#include <numeric>
+//PROV --DELETE
+#include <cassert>
 
 using namespace eutelescope;
 
@@ -35,7 +44,8 @@ EUTelAPIXTbTrackTuple::EUTelAPIXTbTrackTuple()
       _hitpattern(nullptr),
       _zstree(nullptr), _nPixHits(0), p_col(nullptr), p_row(nullptr), p_tot(nullptr),
       p_iden(nullptr), p_lv1(nullptr), p_hitTime(nullptr), p_frameTime(nullptr),
-      _mhits(nullptr),_nmHits(0),_mhitXpos(nullptr),_mhitYpos(nullptr),_mhitTOT(nullptr),
+      _mhits(nullptr),_nmHits(0),_mhitXpos(nullptr),_mhitYpos(nullptr),
+      _mhitEtaX(nullptr),_mhitEtaY(nullptr),_mhitTOT(nullptr),
       _mhitId(nullptr),_mhitBCID(nullptr),_mhitSize(nullptr),
       _euhits(nullptr), _nHits(0), _hitXPos(nullptr), _hitYPos(nullptr), _hitZPos(nullptr),
       _hitSensorId(nullptr) {
@@ -247,20 +257,47 @@ bool EUTelAPIXTbTrackTuple::readMeasHits(std::string hitColName, LCEvent *event)
             return false;
         }
         // Note that the TrackDataImpl::getChargeValues() function returns a vector which
-        // conntains [X-coordinate,Y-coordinate, TOT ,time, ??, ?? , ?? ,?? ] per each element of the cluster
+        // contains [X-coordinate,Y-coordinate, TOT ,time, ??, ?? , ?? ,?? ] per each element of the cluster
         auto & zsdata = static_cast<TrackerDataImpl*>(raw[0])->getChargeValues();
-        int charge=0;
+        std::map<std::pair<int,int>,int> cluster;
         for(unsigned int k=0; k < zsdata.size()-7; k+=8)
         {
-            charge += zsdata[k+2];
+            //charge += zsdata[k+2];
+            cluster[std::pair<int,int>(zsdata[k],zsdata[k+1])] = zsdata[k+2];
         }
-        // Obtain the eta
-        // ---- blahablha 
-        //int clusterSizeX = -1;
-        //int clusterSizeY = -1;
-        //cluster->getClusterSize(clusterSizeX,clusterSizeY);
-        //int clusterSize = clusterSizeX*clusterSizeY;
-        
+        // Adding up charge:
+        const int charge = std::accumulate(
+                std::begin(cluster),
+                std::end(cluster),
+                0,
+                [](int value,const std::map<std::pair<int,int>,int>::value_type& p)
+                {
+                    return value+p.second;
+                });
+        // Flattening the cluster
+        std::map<int,int> cluster_x;
+        std::map<int,int> cluster_y;
+        std::for_each(cluster.begin(),cluster.end(), 
+                [&](std::pair<const std::pair<int,int>,int> & el)
+                {
+                    if(cluster_x.find(el.first.first) != cluster_x.end())
+                    {
+                        cluster_x[el.first.first] += el.second;
+                    }
+                    else
+                    {
+                        cluster_x.insert(std::make_pair(el.first.first,el.second));
+                    }
+                    if(cluster_y.find(el.first.second) != cluster_y.end())
+                    {
+                        cluster_y[el.first.second] += el.second;
+                    }
+                    else
+                    {
+                        cluster_y.insert(std::make_pair(el.first.second,el.second));
+                    }
+                });
+
         // Fill the tree
         // offset by half sensor/sensitive size
         _mhitXpos->push_back(pos[0]+_xSensSize.at(sensorID)/2.0);
@@ -268,11 +305,78 @@ bool EUTelAPIXTbTrackTuple::readMeasHits(std::string hitColName, LCEvent *event)
         _mhitTOT->push_back(charge);
         _mhitId->push_back(sensorID);
         _mhitBCID->push_back(zsdata[3]);
-        //_mhitSize->push_back(clusterSize);
         _mhitSize->push_back(zsdata.size()/8);
+        _mhitSizeX->push_back( cluster_x.size() );
+        _mhitEtaX->push_back( static_cast<float>(cluster_x.cbegin()->second)/static_cast<float>(charge) );
+        _mhitSizeY->push_back( cluster_y.size() );
+        _mhitEtaY->push_back( static_cast<float>(cluster_y.cbegin()->second)/static_cast<float>(charge) );
     }
     return true;
 }
+
+
+EUTelVirtualCluster * EUTelAPIXTbTrackTuple::get_cluster_from_raw_data(EVENT::LCObject * raw, EVENT::LCEvent * evt )
+{
+    // XXX: HARDCODED!! In order to avoid the use of the cluster collection from
+    // the data, the hardcoded encoding string is included here. This is dangerous,
+    // as the decoding could change at some point. Maybe it would be better to 
+    // include the cluster collection explicitly.. 
+    const auto st_encoding("sensorID:7,xSeed:12,ySeed:12,xCluSize:5,yCluSize:5,type:5,quality:5");
+
+    EUTelVirtualCluster * cluster =  nullptr;
+    UTIL::CellIDDecoder<TrackerPulseImpl> clDec(st_encoding);
+    const int tmp = clDec(nullptr)["type"];
+    const ClusterType type(static_cast<ClusterType>(tmp));
+    if(type == kEUTelDFFClusterImpl) 
+    {
+        // digital fixed cluster implementation. Remember it can come from
+        // both RAW and ZS data
+        cluster = new EUTelDFFClusterImpl(static_cast<TrackerDataImpl *>(raw));
+    }
+    else if(type == kEUTelFFClusterImpl) 
+    {
+        // fixed cluster implementation. Remember it can come from
+        // both RAW and ZS data
+        cluster = new EUTelFFClusterImpl(static_cast<TrackerDataImpl *>(raw));
+    } 
+    else if(type == kEUTelBrickedClusterImpl)
+    {
+        // bricked cluster implementation
+        // Remember it can come from both RAW and ZS data
+        cluster = new EUTelBrickedClusterImpl(static_cast<TrackerDataImpl *>(raw));
+    }
+    else if(type == kEUTelSparseClusterImpl) 
+    {
+        // ok the cluster is of sparse type, but we also need to know
+        // the kind of pixel description used. This information is
+        // stored in the corresponding cluster data collection.
+        LCCollectionVec *sparseClusterCollectionVec =  
+            dynamic_cast<LCCollectionVec *>(evt->getCollection(_dutZsColName));
+        TrackerDataImpl *oneCluster = dynamic_cast<TrackerDataImpl *>(sparseClusterCollectionVec->getElementAt(0));
+        UTIL::CellIDDecoder<TrackerDataImpl> anotherDecoder(sparseClusterCollectionVec);
+        SparsePixelType pixelType = static_cast<SparsePixelType>(static_cast<int>(anotherDecoder(oneCluster)["sparsePixelType"]));
+
+        // now we know the pixel type. So we can properly create a new
+        // instance of the sparse cluster
+        if(pixelType == kEUTelGenericSparsePixel) 
+        {
+            cluster = new EUTelSparseClusterImpl<EUTelGenericSparsePixel>(static_cast<TrackerDataImpl *>(raw));
+        }
+        else
+        {
+            streamlog_out(ERROR4) << "Unknown pixel type. Quitting..." << std::endl;
+            throw UnknownDataTypeException("Pixel type unknown");
+        }
+    }
+    else
+    {
+        streamlog_out(ERROR4) << "Unknown cluster type. Quitting..." << std::endl;
+        throw UnknownDataTypeException("Cluster type unknown");
+    }
+    
+    return cluster;
+}
+
 
 // Read in TrackerHit to later dump
 bool EUTelAPIXTbTrackTuple::readTracks(LCEvent *event) {
@@ -432,10 +536,14 @@ void EUTelAPIXTbTrackTuple::clear() {
   _nmHits=0;
   _mhitXpos->clear();
   _mhitYpos->clear(); 
+  _mhitEtaX->clear();
+  _mhitEtaY->clear();
   _mhitTOT->clear();
   _mhitId->clear();
   _mhitBCID->clear();
   _mhitSize->clear();
+  _mhitSizeX->clear();
+  _mhitSizeX->clear();
 
   /* Clear hittrack */
   _xPos->clear();
@@ -469,10 +577,14 @@ void EUTelAPIXTbTrackTuple::prepareTree() {
   
   _mhitXpos = new std::vector<double>();
   _mhitYpos = new std::vector<double>();
+  _mhitEtaX = new std::vector<double>();
+  _mhitEtaY = new std::vector<double>();
   _mhitTOT  = new std::vector<int>();
   _mhitId   = new std::vector<int>();
   _mhitBCID = new std::vector<int>();
   _mhitSize = new std::vector<int>();
+  _mhitSizeX= new std::vector<int>();
+  _mhitSizeY= new std::vector<int>();
 
   p_col = new std::vector<int>();
   p_row = new std::vector<int>();
@@ -518,10 +630,14 @@ void EUTelAPIXTbTrackTuple::prepareTree() {
   _mhits->Branch("nHits", &_nmHits);
   _mhits->Branch("xPos", &_mhitXpos);
   _mhits->Branch("yPos", &_mhitYpos);
+  _mhits->Branch("eta_x", &_mhitEtaX);
+  _mhits->Branch("eta_y", &_mhitEtaY);
   _mhits->Branch("tot", &_mhitTOT);
   _mhits->Branch("sensorId", &_mhitId);
   _mhits->Branch("bcid", &_mhitBCID);
   _mhits->Branch("clusterSize", &_mhitSize);
+  _mhits->Branch("clusterSize_x", &_mhitSizeX);
+  _mhits->Branch("clusterSize_y", &_mhitSizeY);
 
   // Tree for storing all track param info
   _eutracks = new TTree("tracks", "tracks");

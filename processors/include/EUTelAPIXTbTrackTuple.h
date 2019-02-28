@@ -12,7 +12,18 @@
 #include <TTree.h>
 #include <TVectorT.h>
 
+// forward declarations
+namespace eutelescope
+{
+    class EUTelVirtualCluster;
+}
+namespace EVENT
+{
+    class LCObject;
+}
+
 namespace eutelescope {
+
   class EUTelAPIXTbTrackTuple : public marlin::Processor {
 
   public:
@@ -34,6 +45,8 @@ namespace eutelescope {
     bool readTracks(LCEvent *event);
     bool readHits(std::string hitColName, LCEvent *event);
     bool readMeasHits(std::string hitColName, LCEvent *event);
+
+    EUTelVirtualCluster * get_cluster_from_raw_data(EVENT::LCObject * raw, EVENT::LCEvent * event);
 
     std::string _inputTrackColName;
     std::string _inputTrackerHitColName;
@@ -89,10 +102,14 @@ namespace eutelescope {
     int _nmHits;
     std::vector<double> *_mhitXpos;
     std::vector<double> *_mhitYpos;
+    std::vector<double> *_mhitEtaX;
+    std::vector<double> *_mhitEtaY;
     std::vector<int>    *_mhitTOT;
     std::vector<int>    *_mhitId;
     std::vector<int>    *_mhitBCID;
     std::vector<int>    *_mhitSize;
+    std::vector<int>    *_mhitSizeX;
+    std::vector<int>    *_mhitSizeY;
 
     TTree *_euhits;
     int _nHits;
