@@ -47,7 +47,7 @@ EUTelAPIXTbTrackTuple::EUTelAPIXTbTrackTuple()
       _mhits(nullptr),_nmHits(0),_mhitXpos(nullptr),_mhitYpos(nullptr),
       _mhitEtaX(nullptr),_mhitEtaY(nullptr),_mhitTOT(nullptr),
       _mhitId(nullptr),_mhitBCID(nullptr),_mhitSize(nullptr),
-      _mhitsSizeX(nullptr),_mhitsSizeY(nullptr),
+      _mhitSizeX(nullptr),_mhitSizeY(nullptr),
       _euhits(nullptr), _nHits(0), _hitXPos(nullptr), _hitYPos(nullptr), _hitZPos(nullptr),
       _hitSensorId(nullptr) {
   // processor description
@@ -280,24 +280,25 @@ bool EUTelAPIXTbTrackTuple::readMeasHits(std::string hitColName, LCEvent *event)
         std::map<int,int> cluster_y;
         std::for_each(cluster.begin(),cluster.end(), 
                 [&](std::pair<const std::pair<int,int>,int> & el)
-                {
-                    if(cluster_x.find(el.first.first) != cluster_x.end())
-                    {
-                        cluster_x[el.first.first] += el.second;
-                    }
-                    else
-                    {
-                        cluster_x.insert(std::make_pair(el.first.first,el.second));
-                    }
-                    if(cluster_y.find(el.first.second) != cluster_y.end())
-                    {
-                        cluster_y[el.first.second] += el.second;
-                    }
-                    else
-                    {
-                        cluster_y.insert(std::make_pair(el.first.second,el.second));
-                    }
-                });
+        {
+            if(cluster_x.find(el.first.first) != cluster_x.end())
+            {
+                cluster_x[el.first.first] += el.second;
+            }
+            else
+            {
+                cluster_x.insert(std::make_pair(el.first.first,el.second));
+            }
+
+            if(cluster_y.find(el.first.second) != cluster_y.end())
+            {
+                cluster_y[el.first.second] += el.second;
+            }
+            else
+            {
+                cluster_y.insert(std::make_pair(el.first.second,el.second));
+            }
+        });
 
         // Fill the tree
         // offset by half sensor/sensitive size
