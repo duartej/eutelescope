@@ -150,6 +150,16 @@ ADD_DEFINITIONS("-DDO_TESTING")
 
 # ---------------------------------------------------------------------------
 
+# -- VERSION FILE, created always to be sure the last commit is used
+EXECUTE_PROCESS(
+	COMMAND bash -c "git describe --all --long|cut -d \"-\" -f 3"
+	OUTPUT_VARIABLE SW_GITCO
+) 
+STRING(REGEX REPLACE "\n$" "" SW_GITCO "${SW_GITCO}")
+MESSAGE("STATUS: [${SW_GITCO}]")
+
+SET(SW_COMMIT "#ifndef GTSW_VERSION_H\n#define GTSW_VERSION_H\n\n#include <string>\n\nconst std::string VERSION=\"${SW_GITCO}\";\n\n#endif")
+FILE(WRITE "./processors/include/EUTELVERSION.h" "${SW_COMMIT}")
 
 # include directories
 include_directories(SYSTEM ./external)

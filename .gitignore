@@ -50,3 +50,6 @@ external/*
 
 #ignore runfolders
 /jobsub/examples/*/*/run*
+
+# Version file created by cmake
+processors/include/EUTELVERSION.h

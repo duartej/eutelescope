@@ -118,8 +118,12 @@ namespace eutelescope {
     std::vector<double> *_hitZPos;
     std::vector<int> *_hitSensorId;
 
-    TTree *_versionTree;
-    std::vector<double> *_versionNo;
+    TTree *_metadataTree;
+    int         _runNumber;
+    std::string _versionNo;
+    std::string _setupZorderPlanesId;
+    std::string _setupPlanesId;
+    std::string _setupDUTLayout;
   };
 
   //! A global instance of the processor.

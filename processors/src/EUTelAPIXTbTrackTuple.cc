@@ -10,6 +10,7 @@
 #include "EUTelBrickedClusterImpl.h"
 #include "EUTelDFFClusterImpl.h"
 #include "EUTelSparseClusterImpl.h"
+#include "EUTELVERSION.h"
 
 // eutelescope geometry
 #include "EUTelGenericPixGeoDescr.h"
@@ -27,10 +28,13 @@
 #include <set>
 #include <algorithm>
 #include <numeric>
+#include <cmath>
 //PROV --DELETE
 #include <cassert>
 
 using namespace eutelescope;
+
+const double unit_um = 1e-3; // [mm]
 
 EUTelAPIXTbTrackTuple::EUTelAPIXTbTrackTuple()
     : Processor("EUTelAPIXTbTrackTuple"), _inputTrackColName(""),
@@ -97,9 +101,20 @@ void EUTelAPIXTbTrackTuple::init() {
   int plane=0;
   for(unsigned int sensorID : geo::gGeometry().sensorIDsVec()) 
   {
+      // Metadata
+      _setupPlanesId += std::to_string(sensorID)+":";
+      _setupZorderPlanesId += std::to_string(plane)+":";
+      const int xpitch = std::round(geo::gGeometry().getPlaneXPitch(sensorID)/unit_um);
+      const int ypitch = std::round(geo::gGeometry().getPlaneYPitch(sensorID)/unit_um);
+      _setupDUTLayout += std::to_string(xpitch)+"x"+std::to_string(ypitch)+":";
+      // Fill the helpers
       _indexIDMap[sensorID] = plane;
       plane++;
   }
+  // remove last semi-colon
+  _setupPlanesId.pop_back(); 
+  _setupZorderPlanesId.pop_back(); 
+  _setupDUTLayout.pop_back();
 
   for (auto dutID : _DUTIDs) {
     // Later we need to shift the sensor since in EUTel centre of sensor is 0|0
@@ -121,6 +136,8 @@ void EUTelAPIXTbTrackTuple::processRunHeader(LCRunHeader *runHeader) {
 
   // Decode and print out Run Header information - just a check
   _runNr = runHeader->getRunNumber();
+  // Metadata (Careful, it is supposed to be only 1)
+  _runNumber = _runNr;
 }
 
 void EUTelAPIXTbTrackTuple::processEvent(LCEvent *event) {
@@ -167,8 +184,8 @@ void EUTelAPIXTbTrackTuple::processEvent(LCEvent *event) {
 
 void EUTelAPIXTbTrackTuple::end() {
   // write version number
-  _versionNo->push_back(1.3);
-  _versionTree->Fill();
+  _versionNo = VERSION;;
+  _metadataTree->Fill();
   // Maybe some stats output?
   _file->Write();
 }
@@ -601,9 +618,12 @@ void EUTelAPIXTbTrackTuple::prepareTree() {
   _hitZPos = new std::vector<double>();
   _hitSensorId = new std::vector<int>();
 
-  _versionNo = new std::vector<double>();
-  _versionTree = new TTree("version", "version");
-  _versionTree->Branch("no", &_versionNo);
+  _metadataTree = new TTree("metadata", "metadata");
+  _metadataTree->Branch("RunNumber", &_runNumber);
+  _metadataTree->Branch("PlanesZorderId", &_setupZorderPlanesId);
+  _metadataTree->Branch("PlanesId", &_setupPlanesId);
+  _metadataTree->Branch("DUTLayouts", &_setupDUTLayout);
+  _metadataTree->Branch("version", &_versionNo);
 
   _euhits = new TTree("fitpoints", "fitpoints");
   _euhits->SetAutoSave(1000000000);
